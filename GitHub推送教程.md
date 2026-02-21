@@ -1,165 +1,202 @@
-# 将项目推送到 GitHub 远程仓库教程
+# 我的代码版本管理教程（零基础）
 
-## 当前状态
+## 当前状态说明
 
-本项目已关联远程仓库：
+你的本地项目（`D:\PyCode\MetaGPT`）已经和你自己的 GitHub 仓库绑定好了：
+
 ```
-origin  https://github.com/FoundationAgents/MetaGPT.git
+本地项目  ←→  https://github.com/OTAKUFF/MultiAgent
 ```
 
-当前有以下未提交的变更：
-- 修改文件：`metagpt/tools/libs/editor.py`
-- 未跟踪文件：`MetaGPT配置指南.md`
-- 未跟踪目录：`启动生成的项目/`
-
-你的 GitHub 用户名：**OTAKUFF**
+**和 MetaGPT 原仓库没有任何关联**，MetaGPT 那边怎么改都不会影响你这里。
 
 ---
 
-## 推送到自己的 GitHub 仓库（完整步骤）
+## 核心概念（先看这个）
 
-### 第一步：配置 Git 用户信息
+Git 的工作流程就像游戏存档：
+
+```
+改代码  →  git add（选择要存的文件）  →  git commit（存档）  →  git push（上传到云端）
+```
+
+- `git add`：告诉 Git "我要存这些文件"
+- `git commit`：真正存档，留下一条记录
+- `git push`：把存档上传到 GitHub（云端备份）
+
+---
+
+## 日常使用流程
+
+### 第一步：查看改了哪些文件
 
 ```bash
-git config --global user.name "OTAKUFF"
-git config --global user.email "你的GitHub注册邮箱"
-```
-
-### 第二步：在 GitHub 上 Fork 原仓库
-
-1. 打开 https://github.com/FoundationAgents/MetaGPT
-2. 点击右上角 **Fork** 按钮
-3. 选择 OTAKUFF 账号，完成 Fork
-
-Fork 完成后你会得到：`https://github.com/OTAKUFF/MetaGPT`
-
-### 第三步：修改本地远程地址
-
-```bash
-# 保留原仓库为 upstream，方便后续同步上游更新
-git remote rename origin upstream
-
-# 添加自己的仓库为 origin
-git remote add origin https://github.com/OTAKUFF/MetaGPT.git
-
-# 验证配置
-git remote -v
-```
-
-输出应为：
-```
-origin    https://github.com/OTAKUFF/MetaGPT.git (fetch)
-origin    https://github.com/OTAKUFF/MetaGPT.git (push)
-upstream  https://github.com/FoundationAgents/MetaGPT.git (fetch)
-upstream  https://github.com/FoundationAgents/MetaGPT.git (push)
-```
-
-### 第四步：决定哪些文件要提交
-
-```bash
-# 查看当前状态
 git status
+```
 
-# 只提交代码修改，不提交本地生成的目录
+输出示例：
+```
+modified:   metagpt/tools/libs/editor.py   ← 修改过的文件（红色）
+Untracked:  我的新脚本.py                  ← 新建的文件（红色）
+```
+
+### 第二步：把文件加入暂存区
+
+```bash
+# 方式 A：添加所有改动的文件（最常用）
+git add .
+
+# 方式 B：只添加某个文件
 git add metagpt/tools/libs/editor.py
 
-# 如果也想提交配置指南
-git add "MetaGPT配置指南.md"
-
-# 如果不想上传"启动生成的项目"目录，先加入 .gitignore
-echo "启动生成的项目/" >> .gitignore
-git add .gitignore
+# 方式 C：添加某个文件夹
+git add metagpt/tools/
 ```
 
-### 第五步：提交变更
+再次运行 `git status`，文件变绿色说明添加成功。
+
+### 第三步：提交（存档）
 
 ```bash
-git commit -m "feat: 修改 editor.py 并添加配置指南"
+git commit -m "这里写你做了什么改动"
 ```
 
-### 第六步：推送到自己的仓库
+提交说明建议写清楚，方便以后回溯，例如：
+```bash
+git commit -m "修改了 editor.py 的文件读取逻辑"
+git commit -m "新增 my_agent.py 实现自动写代码功能"
+git commit -m "修复运行报错的 bug"
+```
+
+### 第四步：推送到 GitHub
 
 ```bash
 git push origin main
 ```
 
----
-
-## 身份验证方式
-
-GitHub 已不支持密码登录，必须使用以下方式之一：
-
-### 方式 A：Personal Access Token（推荐，简单）
-
-1. 登录 GitHub → 右上角头像 → **Settings**
-2. 左侧菜单最底部 → **Developer settings**
-3. **Personal access tokens** → **Tokens (classic)**
-4. **Generate new token (classic)**，勾选 `repo` 权限，生成并复制 token
-
-推送时输入：
-```
-Username: OTAKUFF
-Password: 粘贴你的 token（不是账号密码）
-```
-
-或者把 token 写入 URL，之后不再需要输入：
-```bash
-git remote set-url origin https://OTAKUFF:你的token@github.com/OTAKUFF/MetaGPT.git
-```
-
-### 方式 B：SSH Key（一次配置，永久免密）
-
-```bash
-# 生成密钥
-ssh-keygen -t ed25519 -C "你的GitHub注册邮箱"
-
-# 查看公钥
-cat ~/.ssh/id_ed25519.pub
-```
-
-复制公钥内容，添加到 GitHub → Settings → **SSH and GPG keys** → **New SSH key**
-
-然后改用 SSH 地址：
-```bash
-git remote set-url origin git@github.com:OTAKUFF/MetaGPT.git
-```
-
-测试连接：
-```bash
-ssh -T git@github.com
-# 成功会显示：Hi OTAKUFF! You've successfully authenticated...
-```
+推送成功后，打开 https://github.com/OTAKUFF/MultiAgent 就能看到最新代码。
 
 ---
 
-## 后续同步上游更新
-
-当原仓库 FoundationAgents/MetaGPT 有新提交时，同步到本地：
+## 查看历史记录
 
 ```bash
-git fetch upstream
-git merge upstream/main
-git push origin main
+# 查看最近 10 条提交记录
+git log --oneline -10
 ```
+
+输出示例：
+```
+56e38824 backup: save local modifications and project files
+11cdf466 修改了 editor.py
+de17c62a 新增配置文件
+```
+
+左边那串字母数字是每次提交的唯一 ID，回溯版本时会用到。
 
 ---
 
-## 常用命令速查
+## 回溯版本（代码写乱了怎么办）
 
-| 命令 | 说明 |
+### 情况一：还没有 commit，想撤销对某个文件的修改
+
+```bash
+# 把 editor.py 恢复到上次 commit 时的状态
+git checkout -- metagpt/tools/libs/editor.py
+```
+
+**注意：这个操作不可撤销，文件会直接还原。**
+
+### 情况二：已经 commit 了，想回到某个历史版本查看
+
+```bash
+# 先查看历史，找到你想回去的那个 commit ID
+git log --oneline -10
+
+# 切换到那个版本（只是查看，不会丢失现在的代码）
+git checkout 56e38824
+```
+
+查看完之后，回到最新版本：
+```bash
+git checkout main
+```
+
+### 情况三：已经 commit 了，想彻底回退到某个历史版本
+
+```bash
+# 先查看历史，找到目标 commit ID
+git log --oneline -10
+
+# 回退到那个版本（之后的提交记录会消失！）
+git reset --hard 56e38824
+
+# 强制推送到 GitHub（覆盖云端）
+git push origin main --force
+```
+
+**警告：`--force` 会覆盖 GitHub 上的记录，确认后再执行。**
+
+---
+
+## 常用命令速查表
+
+| 命令 | 作用 |
 |------|------|
-| `git status` | 查看当前变更状态 |
-| `git add .` | 暂存所有变更 |
-| `git add <文件>` | 暂存指定文件 |
-| `git commit -m "说明"` | 提交变更 |
-| `git push origin main` | 推送到自己的远程仓库 |
-| `git fetch upstream` | 拉取上游原仓库的更新 |
-| `git log --oneline -5` | 查看最近5条提交记录 |
+| `git status` | 查看哪些文件被修改了 |
+| `git add .` | 暂存所有改动 |
+| `git add <文件路径>` | 暂存指定文件 |
+| `git commit -m "说明"` | 提交存档 |
+| `git push origin main` | 推送到 GitHub |
+| `git log --oneline -10` | 查看最近 10 条提交记录 |
+| `git checkout -- <文件>` | 撤销某文件的未提交修改 |
+| `git checkout main` | 回到最新版本 |
+| `git reset --hard <ID>` | 强制回退到某个版本 |
 
 ---
 
 ## 注意事项
 
-- `启动生成的项目/` 目录建议加入 `.gitignore`，避免把本地生成内容推上去
-- 不要将包含 API Key 的配置文件提交到公开仓库
-- token 不要硬编码进代码，也不要提交到仓库
+- **不要提交 API Key**：`config/config2.yaml` 里如果有 API Key，确保它在 `.gitignore` 里
+- **不要提交大文件**：模型权重、数据集等大文件不适合放 GitHub
+- **提交说明写清楚**：方便以后自己看懂每次改了什么
+- **推送前先 commit**：没有 commit 的内容无法推送
+
+---
+
+## 身份验证（推送时要求输入密码）
+
+GitHub 不支持账号密码登录，需要用 Token。
+
+### 生成 Token
+
+1. 登录 GitHub → 右上角头像 → **Settings**
+2. 左侧最底部 → **Developer settings**
+3. **Personal access tokens** → **Tokens (classic)**
+4. **Generate new token (classic)**，勾选 `repo`，生成并复制
+
+### 把 Token 写入远程地址（一次配置，之后不再询问）
+
+```bash
+git remote set-url origin https://OTAKUFF:你的token@github.com/OTAKUFF/MultiAgent.git
+```
+
+把 `你的token` 替换成刚才复制的内容。
+
+---
+
+## 验证当前配置
+
+随时可以运行这个命令确认仓库连接正确：
+
+```bash
+git remote -v
+```
+
+正确输出应该是：
+```
+origin  https://github.com/OTAKUFF/MultiAgent.git (fetch)
+origin  https://github.com/OTAKUFF/MultiAgent.git (push)
+```
+
+只有这一个 origin，没有 upstream，说明和 MetaGPT 原仓库完全独立。
