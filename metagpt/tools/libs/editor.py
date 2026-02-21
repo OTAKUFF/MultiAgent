@@ -1095,8 +1095,23 @@ class Editor(BaseModel):
 
     def _try_fix_path(self, path: Union[Path, str]) -> Path:
         """Tries to fix the path if it is not absolute."""
+        import platform
         if not isinstance(path, Path):
-            path = Path(path)
+            path_str = str(path)
+            # On Windows, Unix-style absolute paths like /workspace/... are treated as
+            # absolute by Path() but resolve to the drive root instead of working_dir.
+            # Remap them to working_dir by stripping the leading /workspace prefix.
+            if platform.system() == "Windows" and path_str.startswith("/"):
+                workspace_root = self.working_dir
+                workspace_name = workspace_root.name  # e.g. "workspace"
+                prefix = f"/{workspace_name}/"
+                if path_str.startswith(prefix):
+                    path = workspace_root / path_str[len(prefix):]
+                else:
+                    # Strip leading slash so it becomes relative, then join with working_dir
+                    path = workspace_root / path_str.lstrip("/")
+            else:
+                path = Path(path)
         if not path.is_absolute():
             path = self.working_dir / path
         return path

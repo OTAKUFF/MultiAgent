@@ -1,0 +1,9 @@
+# 1. 激活正确的虚拟环境 metagpt_env
+  metagpt_env\Scripts\activate
+
+# 2. 现在可以运行了
+  metagpt "制作一个打砖块游戏，使用 pygame，包含挡板、小球和多行砖块，支持生命值系统"
+
+  或者直接使用完整路径运行（不需要激活）：
+
+  metagpt_env\Scripts\metagpt.exe "制作一个打砖块游戏，使用 pygame，包含挡板、小球和多行砖块，支持生命值系统"
