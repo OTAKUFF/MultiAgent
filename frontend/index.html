@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MetaGPT Mission Control</title>
+<title>MetaGPT</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -27,24 +27,20 @@
   --bob:#a78bfa;
   --alex:#fb923c;
   --dana:#34d399;
-  --thought:#a78bfa;
-  --docs:#60a5fa;
-  --editor:#fbbf24;
-  --terminal:#2dd4bf;
-  --task:#34d399;
-  --log:#64748b;
-  --warning:#f59e0b;
+  --eve:#fbbf24;
+  --david:#2dd4bf;
   --radius:14px;
   --radius-sm:10px;
   --font-body:'DM Sans',system-ui,-apple-system,sans-serif;
   --font-mono:'JetBrains Mono','Fira Code',monospace;
+  --left-width:260px;
+  --right-width:0px;
 }
 html{font-size:15px;-webkit-font-smoothing:antialiased}
 body{
   font-family:var(--font-body);color:var(--text-primary);
-  background:var(--bg-deep);min-height:100vh;overflow-x:hidden;
+  background:var(--bg-deep);height:100vh;overflow:hidden;
 }
-/* ── Atmospheric Background ─────────────────────────────────────── */
 body::before{
   content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
@@ -52,498 +48,370 @@ body::before{
     radial-gradient(ellipse 60% 50% at 80% 80%,rgba(167,139,250,0.04),transparent),
     radial-gradient(ellipse 50% 40% at 50% 50%,rgba(52,211,153,0.02),transparent);
 }
-/* noise overlay */
-body::after{
-  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.025;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-/* ── Layout Shell ───────────────────────────────────────────────── */
-.app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+/* ── App Shell ──────────────────────────────────────────────────── */
+.app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh}
 /* ── Header ─────────────────────────────────────────────────────── */
 .header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:16px 28px;
+  padding:10px 20px;
   border-bottom:1px solid var(--border);
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  background:rgba(6,10,20,0.6);
-  position:sticky;top:0;z-index:100;
+  backdrop-filter:blur(20px);background:rgba(6,10,20,0.6);
+  flex-shrink:0;
 }
-.brand{display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
 .brand-icon{
-  width:34px;height:34px;border-radius:9px;
+  width:30px;height:30px;border-radius:8px;
   background:linear-gradient(135deg,var(--accent),#7c5cfc);
   display:grid;place-items:center;
-  box-shadow:0 0 20px rgba(79,140,255,0.25);
+  box-shadow:0 0 16px rgba(79,140,255,0.25);
 }
-.brand-icon svg{width:18px;height:18px;fill:#fff}
-.brand-name{font-size:1.15rem;font-weight:700;letter-spacing:-0.02em;color:var(--text-primary)}
-.brand-tag{
-  font-size:0.7rem;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;
-  color:var(--text-muted);margin-left:4px;
-  padding:3px 8px;border-radius:6px;background:rgba(79,140,255,0.08);
-  border:1px solid rgba(79,140,255,0.12);
-}
-.conn-status{display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-secondary)}
+.brand-icon svg{width:16px;height:16px;fill:#fff}
+.brand-name{font-size:1.05rem;font-weight:700;letter-spacing:-0.02em}
+.header-right{display:flex;align-items:center;gap:14px}
+.conn-status{display:flex;align-items:center;gap:6px;font-size:0.75rem;color:var(--text-secondary)}
 .conn-dot{
-  width:8px;height:8px;border-radius:50%;background:#ef4444;
-  box-shadow:0 0 8px rgba(239,68,68,0.5);
-  transition:all 0.4s ease;
+  width:7px;height:7px;border-radius:50%;background:#ef4444;
+  box-shadow:0 0 8px rgba(239,68,68,0.5);transition:all 0.4s;
 }
 .conn-dot.on{background:#22c55e;box-shadow:0 0 10px rgba(34,197,94,0.5)}
-/* ── Main Grid ──────────────────────────────────────────────────── */
-.main{display:grid;grid-template-columns:1fr 340px;gap:0;flex:1;overflow:hidden}
-/* ── Activity Feed (Left) ───────────────────────────────────────── */
-.feed-col{
-  display:flex;flex-direction:column;
-  border-right:1px solid var(--border);overflow:hidden;
+.toggle-btn{
+  background:none;border:1px solid var(--border);border-radius:6px;
+  color:var(--text-secondary);padding:5px 10px;font-size:0.72rem;
+  cursor:pointer;font-family:var(--font-body);transition:all 0.2s;
 }
-.feed-header{
-  padding:18px 24px 14px;
-  border-bottom:1px solid var(--border);
+.toggle-btn:hover{border-color:var(--accent);color:var(--text-primary)}
+.toggle-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+/* ── 3-Column Layout ────────────────────────────────────────────── */
+.main{
+  display:grid;
+  grid-template-columns:var(--left-width) 1fr var(--right-width);
+  flex:1;overflow:hidden;
+  transition:grid-template-columns 0.3s ease;
+}
+.main.left-collapsed{grid-template-columns:0px 1fr var(--right-width)}
+.main.right-open{--right-width:320px}
+/* ── Left: Project List ─────────────────────────────────────────── */
+.left-panel{
+  display:flex;flex-direction:column;
+  border-right:1px solid var(--border);
+  background:rgba(6,10,20,0.4);
+  overflow:hidden;transition:opacity 0.3s;
+}
+.main.left-collapsed .left-panel{opacity:0;pointer-events:none}
+.left-header{
+  padding:14px 16px;border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;
 }
-.section-title{
-  font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;
-  color:var(--text-muted);
+.left-title{font-size:0.72rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted)}
+.project-list{flex:1;overflow-y:auto;padding:6px 8px}
+.project-list::-webkit-scrollbar{width:3px}
+.project-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.project-item{
+  padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;
+  margin-bottom:2px;transition:all 0.2s;
 }
-.feed-count{
-  font-size:0.7rem;color:var(--text-muted);
-  font-family:var(--font-mono);font-weight:400;
+.project-item:hover{background:var(--bg-card-hover)}
+.project-item.active{background:var(--accent-glow);border:1px solid var(--border-active)}
+.project-item .p-name{font-size:0.82rem;font-weight:500;color:var(--text-primary);margin-bottom:2px}
+.project-item .p-time{font-size:0.68rem;color:var(--text-muted);font-family:var(--font-mono)}
+.new-project-btn{
+  margin:8px;padding:10px;border-radius:var(--radius-sm);
+  border:1px dashed var(--border);background:none;
+  color:var(--text-secondary);font-size:0.82rem;cursor:pointer;
+  font-family:var(--font-body);transition:all 0.2s;
 }
-.feed-scroll{flex:1;overflow-y:auto;padding:8px 12px;scroll-behavior:smooth}
-.feed-scroll::-webkit-scrollbar{width:4px}
-.feed-scroll::-webkit-scrollbar-track{background:transparent}
-.feed-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-/* feed items */
-.feed-item{
-  display:flex;gap:12px;padding:10px 12px;border-radius:var(--radius-sm);
-  transition:background 0.2s;animation:feedIn 0.35s ease both;
+.new-project-btn:hover{border-color:var(--accent);color:var(--accent)}
+/* ── Center: Chat Area ──────────────────────────────────────────── */
+.chat-col{
+  display:flex;flex-direction:column;overflow:hidden;
 }
-.feed-item:hover{background:var(--bg-card)}
-@keyframes feedIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.feed-avatar{
+.chat-scroll{
+  flex:1;overflow-y:auto;padding:20px 24px;scroll-behavior:smooth;
+  display:flex;flex-direction:column;
+}
+.chat-scroll::-webkit-scrollbar{width:4px}
+.chat-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+/* Chat bubbles */
+.chat-msg{display:flex;gap:10px;margin-bottom:14px;animation:msgIn 0.3s ease both;max-width:85%}
+@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.chat-msg.role{align-self:flex-start}
+.chat-msg.user{align-self:flex-end;flex-direction:row-reverse}
+.chat-msg.system{align-self:center;max-width:70%}
+.chat-avatar{
   width:32px;height:32px;border-radius:50%;flex-shrink:0;
   display:grid;place-items:center;font-size:0.7rem;font-weight:700;color:#fff;
-  position:relative;
 }
-.feed-avatar::after{
-  content:'';position:absolute;inset:-2px;border-radius:50%;
-  border:1.5px solid transparent;opacity:0.4;
+.chat-bubble{
+  padding:10px 14px;border-radius:14px;font-size:0.84rem;line-height:1.55;
+  word-break:break-word;white-space:pre-wrap;
 }
-.feed-body{flex:1;min-width:0}
-.feed-meta{display:flex;align-items:center;gap:8px;margin-bottom:3px}
-.feed-role{font-size:0.78rem;font-weight:600;color:var(--text-primary)}
-.feed-type{
-  font-size:0.62rem;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;
-  padding:2px 7px;border-radius:5px;
+.chat-msg.role .chat-bubble{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-top-left-radius:4px;
 }
-.feed-time{font-size:0.68rem;color:var(--text-muted);margin-left:auto;font-family:var(--font-mono);font-weight:300}
-.feed-text{font-size:0.82rem;color:var(--text-secondary);line-height:1.5;word-break:break-word}
-/* type colors */
-.type-thought{background:rgba(167,139,250,0.12);color:#c4b5fd}
-.type-docs{background:rgba(96,165,250,0.12);color:#93c5fd}
-.type-editor{background:rgba(251,191,36,0.12);color:#fcd34d}
-.type-terminal{background:rgba(45,212,191,0.12);color:#5eead4}
-.type-task{background:rgba(52,211,153,0.12);color:#6ee7b7}
-.type-log{background:rgba(100,116,139,0.1);color:#94a3b8}
-.type-warning{background:rgba(245,158,11,0.12);color:#fbbf24}
-/* ── Sidebar (Right) ───────────────────────────────────────────── */
-.sidebar{display:flex;flex-direction:column;gap:0;overflow-y:auto;overflow-x:hidden}
-.sidebar::-webkit-scrollbar{width:4px}
-.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-.card{
-  padding:20px;border-bottom:1px solid var(--border);
+.chat-msg.user .chat-bubble{
+  background:linear-gradient(135deg,var(--accent),#6366f1);color:#fff;
+  border-top-right-radius:4px;
 }
-.card-title{
-  font-size:0.7rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;
-  color:var(--text-muted);margin-bottom:14px;
+.chat-msg.system .chat-bubble{
+  background:rgba(100,116,139,0.12);color:var(--text-secondary);
+  font-size:0.78rem;text-align:center;border-radius:8px;
 }
-/* ── Stage Card ─────────────────────────────────────────────────── */
-.stage-content{
-  padding:16px;border-radius:var(--radius-sm);
-  background:linear-gradient(135deg,rgba(79,140,255,0.08),rgba(124,92,252,0.05));
-  border:1px solid rgba(79,140,255,0.12);
+.chat-sender{font-size:0.7rem;font-weight:600;margin-bottom:3px}
+.chat-time{font-size:0.62rem;color:var(--text-muted);margin-top:4px;font-family:var(--font-mono)}
+/* Code blocks inside bubbles */
+.chat-bubble pre{
+  background:rgba(0,0,0,0.3);border-radius:6px;padding:8px 10px;
+  margin:6px 0;overflow-x:auto;font-family:var(--font-mono);font-size:0.78rem;
 }
-.stage-label{font-size:1.05rem;font-weight:600;color:var(--text-primary);line-height:1.4}
-.stage-role{font-size:0.78rem;color:var(--accent);margin-top:6px;font-weight:500}
-.stage-file{
-  font-size:0.75rem;color:var(--editor);margin-top:5px;
-  font-family:var(--font-mono);font-weight:400;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+.chat-bubble code{
+  font-family:var(--font-mono);font-size:0.8rem;
+  background:rgba(0,0,0,0.2);padding:1px 5px;border-radius:3px;
 }
-.stage-idle{color:var(--text-muted);font-size:0.88rem}
-/* pulse animation for active stage */
-.stage-content.active{animation:stagePulse 2.5s ease-in-out infinite}
-@keyframes stagePulse{
-  0%,100%{box-shadow:0 0 0 0 rgba(79,140,255,0)}
-  50%{box-shadow:0 0 20px 0 rgba(79,140,255,0.08)}
+.chat-bubble pre code{background:none;padding:0}
+/* Thinking indicator */
+.thinking-indicator{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px;border-radius:14px;background:var(--bg-card);
+  border:1px solid var(--border);font-size:0.78rem;color:var(--text-secondary);
+  cursor:pointer;margin-bottom:14px;
 }
-/* ── Team Card ──────────────────────────────────────────────────── */
-.team-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
-.team-member{
-  display:flex;flex-direction:column;align-items:center;gap:6px;
-  width:56px;transition:all 0.3s ease;cursor:default;
+.thinking-dots span{
+  display:inline-block;width:5px;height:5px;border-radius:50%;
+  background:var(--accent);animation:dotPulse 1.4s ease infinite;
 }
-.team-member:hover{transform:translateY(-2px)}
-.team-avatar{
-  width:42px;height:42px;border-radius:50%;
-  display:grid;place-items:center;font-size:0.82rem;font-weight:700;color:#fff;
-  position:relative;transition:all 0.3s ease;
-  box-shadow:0 2px 10px rgba(0,0,0,0.3);
+.thinking-dots span:nth-child(2){animation-delay:0.2s}
+.thinking-dots span:nth-child(3){animation-delay:0.4s}
+@keyframes dotPulse{0%,80%,100%{opacity:0.3;transform:scale(0.8)}40%{opacity:1;transform:scale(1)}}
+.thinking-content{
+  display:none;margin-top:6px;padding:8px;border-radius:6px;
+  background:rgba(0,0,0,0.2);font-family:var(--font-mono);font-size:0.75rem;
+  color:var(--text-secondary);white-space:pre-wrap;word-break:break-all;
+  max-height:150px;overflow-y:auto;
 }
-.team-member.active .team-avatar{
-  box-shadow:0 0 0 2.5px var(--bg-deep),0 0 0 4.5px currentColor,0 0 20px rgba(79,140,255,0.3);
-  transform:scale(1.08);
+.thinking-indicator.expanded .thinking-content{display:block}
+/* ── Input Area ─────────────────────────────────────────────────── */
+.input-area{
+  padding:12px 20px 16px;border-top:1px solid var(--border);
+  background:rgba(6,10,20,0.5);backdrop-filter:blur(12px);
+  display:flex;align-items:flex-end;gap:10px;flex-shrink:0;
 }
-.team-member.active .team-avatar::after{
-  content:'';position:absolute;bottom:-1px;right:-1px;
-  width:10px;height:10px;border-radius:50%;
-  background:#22c55e;border:2px solid var(--bg-deep);
-}
-.team-name{font-size:0.65rem;color:var(--text-muted);font-weight:500;text-align:center;line-height:1.2}
-.team-member.active .team-name{color:var(--text-primary)}
-/* ── Tasks Card ─────────────────────────────────────────────────── */
-.task-list{list-style:none;display:flex;flex-direction:column;gap:4px}
-.task-item{
-  display:flex;align-items:flex-start;gap:10px;
-  padding:9px 12px;border-radius:var(--radius-sm);
-  font-size:0.8rem;color:var(--text-secondary);line-height:1.4;
-  transition:all 0.2s;
-}
-.task-item:hover{background:var(--bg-card)}
-.task-icon{
-  width:18px;height:18px;border-radius:50%;flex-shrink:0;margin-top:1px;
-  border:1.5px solid var(--border);display:grid;place-items:center;
-  transition:all 0.3s;
-}
-.task-item.current{background:rgba(79,140,255,0.06);border:1px solid rgba(79,140,255,0.15)}
-.task-item.current .task-icon{
-  border-color:var(--accent);background:var(--accent);
-  animation:taskSpin 1.5s linear infinite;
-}
-.task-item.current .task-icon::after{
-  content:'';width:8px;height:8px;border:1.5px solid transparent;
-  border-top-color:#fff;border-radius:50%;
-}
-@keyframes taskSpin{to{transform:rotate(360deg)}}
-.task-item.finished{opacity:0.45}
-.task-item.finished .task-icon{border-color:var(--task);background:var(--task)}
-.task-item.finished .task-icon::after{
-  content:'';width:6px;height:3px;border-left:1.5px solid #fff;border-bottom:1.5px solid #fff;
-  transform:rotate(-45deg);margin-top:-1px;
-}
-.task-text{flex:1;min-width:0}
-.task-badge{
-  font-size:0.6rem;font-weight:600;letter-spacing:0.04em;
-  padding:2px 7px;border-radius:5px;
-  background:rgba(79,140,255,0.15);color:var(--accent);white-space:nowrap;
-}
-.task-empty{color:var(--text-muted);font-size:0.8rem;padding:8px 0}
-/* ── Start Bar ─────────────────────────────────────────────────── */
-.start-bar{
-  display:flex;align-items:center;gap:10px;
-  padding:10px 24px;
-  border-bottom:1px solid var(--border);
-  background:rgba(6,10,20,0.4);backdrop-filter:blur(12px);
-}
-.start-input{
-  flex:1;padding:9px 14px;border-radius:var(--radius-sm);
+.input-area textarea{
+  flex:1;padding:10px 14px;border-radius:var(--radius-sm);
   background:var(--bg-card);border:1px solid var(--border);
   color:var(--text-primary);font-family:var(--font-body);font-size:0.88rem;
-  outline:none;transition:border-color 0.2s;
+  outline:none;resize:none;min-height:42px;max-height:120px;
+  line-height:1.5;transition:border-color 0.2s;
 }
-.start-input:focus{border-color:var(--accent)}
-.start-input::placeholder{color:var(--text-muted)}
-.start-btn{
-  padding:9px 20px;border-radius:var(--radius-sm);border:none;
+.input-area textarea:focus{border-color:var(--accent)}
+.input-area textarea::placeholder{color:var(--text-muted)}
+.send-btn{
+  padding:10px 20px;border-radius:var(--radius-sm);border:none;
   background:linear-gradient(135deg,var(--accent),#7c5cfc);
   color:#fff;font-family:var(--font-body);font-size:0.85rem;font-weight:600;
   cursor:pointer;white-space:nowrap;transition:opacity 0.2s,transform 0.1s;
+  flex-shrink:0;
 }
-.start-btn:hover{opacity:0.9;transform:translateY(-1px)}
-.start-btn:active{transform:translateY(0)}
-.start-btn:disabled{opacity:0.45;cursor:not-allowed;transform:none}
-/* ── LLM Panel (Bottom) ────────────────────────────────────────── */
-.llm-panel{
-  border-top:1px solid var(--border);
-  background:rgba(6,10,20,0.5);backdrop-filter:blur(10px);
-}
-.llm-toggle{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:10px 24px;cursor:pointer;user-select:none;
-  transition:background 0.2s;
-}
-.llm-toggle:hover{background:var(--bg-card)}
-.llm-toggle-left{display:flex;align-items:center;gap:8px}
-.llm-toggle-label{font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted)}
-.llm-toggle-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);transition:all 0.3s}
-.llm-toggle-dot.streaming{background:var(--accent);box-shadow:0 0 8px rgba(79,140,255,0.5);animation:blink 1s ease infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
-.llm-chevron{
-  width:16px;height:16px;color:var(--text-muted);
-  transition:transform 0.3s ease;
-}
-.llm-panel.open .llm-chevron{transform:rotate(180deg)}
-.llm-body{
-  max-height:0;overflow:hidden;transition:max-height 0.35s ease;
-}
-.llm-panel.open .llm-body{max-height:220px}
-.llm-scroll{
-  height:200px;overflow-y:auto;padding:0 24px 16px;
-  font-family:var(--font-mono);font-size:0.78rem;font-weight:300;
-  line-height:1.7;color:var(--text-secondary);
-  white-space:pre-wrap;word-break:break-all;
-}
-.llm-scroll::-webkit-scrollbar{width:4px}
-.llm-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-/* ── Utility ────────────────────────────────────────────────────── */
-.empty-state{
+.send-btn:hover{opacity:0.9;transform:translateY(-1px)}
+.send-btn:active{transform:translateY(0)}
+.send-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+/* ── Right: Code Preview ────────────────────────────────────────── */
+.right-panel{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:48px 24px;color:var(--text-muted);gap:12px;flex:1;
+  border-left:1px solid var(--border);background:rgba(6,10,20,0.4);
+  overflow:hidden;transition:opacity 0.3s;
 }
-.empty-icon{width:48px;height:48px;opacity:0.3}
-.empty-text{font-size:0.85rem;text-align:center}
+.main:not(.right-open) .right-panel{opacity:0;pointer-events:none;width:0}
+.right-placeholder{text-align:center;color:var(--text-muted);padding:20px}
+.right-placeholder svg{width:48px;height:48px;opacity:0.3;margin-bottom:12px}
+.right-placeholder p{font-size:0.82rem}
+.right-placeholder span{font-size:0.7rem;opacity:0.6}
+/* ── Empty state ────────────────────────────────────────────────── */
+.chat-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;color:var(--text-muted);gap:10px;
+}
+.chat-empty svg{width:48px;height:48px;opacity:0.25}
+.chat-empty p{font-size:0.88rem}
 /* ── Responsive ─────────────────────────────────────────────────── */
-@media(max-width:900px){
-  .main{grid-template-columns:1fr}
-  .feed-col{border-right:none;max-height:50vh}
-  .sidebar{flex-direction:row;flex-wrap:wrap}
-  .card{flex:1;min-width:280px}
+@media(max-width:768px){
+  .main{grid-template-columns:0px 1fr 0px !important}
+  .left-panel,.right-panel{display:none}
 }
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- ── Header ──────────────────────────────────────────────── -->
+  <!-- Header -->
   <header class="header">
     <div class="brand">
       <div class="brand-icon">
         <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       </div>
       <span class="brand-name">MetaGPT</span>
-      <span class="brand-tag">Mission Control</span>
     </div>
-    <div class="conn-status">
-      <div class="conn-dot" id="connDot"></div>
-      <span id="connText">未连接</span>
+    <div class="header-right">
+      <div class="conn-status">
+        <div class="conn-dot" id="connDot"></div>
+        <span id="connText">未连接</span>
+      </div>
+      <button class="toggle-btn" id="toggleLeft" onclick="toggleLeft()">项目列表</button>
+      <button class="toggle-btn" id="toggleRight" onclick="toggleRight()">代码预览</button>
     </div>
   </header>
 
-  <!-- ── Start Bar ─────────────────────────────────────────────── -->
-  <div class="start-bar">
-    <input class="start-input" id="ideaInput" type="text" placeholder="输入你的需求，例如：制作一个打砖块游戏..." autocomplete="off">
-    <button class="start-btn" id="startBtn" onclick="startMetaGPT()">启动</button>
-  </div>
-
-  <!-- ── Main ────────────────────────────────────────────────── -->
-  <div class="main">
-    <!-- Activity Feed -->
-    <div class="feed-col">
-      <div class="feed-header">
-        <span class="section-title">Activity Feed</span>
-        <span class="feed-count" id="feedCount">0 events</span>
+  <!-- Main 3-column -->
+  <div class="main" id="mainGrid">
+    <!-- Left: Projects -->
+    <div class="left-panel">
+      <div class="left-header">
+        <span class="left-title">项目</span>
       </div>
-      <div class="feed-scroll" id="feedScroll">
-        <div class="empty-state" id="feedEmpty">
-          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          <div class="empty-text">等待 MetaGPT 启动...</div>
+      <div class="project-list" id="projectList"></div>
+      <button class="new-project-btn" onclick="newProject()">+ 新建项目</button>
+    </div>
+
+    <!-- Center: Chat -->
+    <div class="chat-col">
+      <div class="chat-scroll" id="chatScroll">
+        <div class="chat-empty" id="chatEmpty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+          <p>输入需求，开始与 AI 团队协作</p>
         </div>
       </div>
-    </div>
-
-    <!-- Sidebar -->
-    <div class="sidebar">
-      <!-- Current Stage -->
-      <div class="card">
-        <div class="card-title">Current Stage</div>
-        <div class="stage-content" id="stageCard">
-          <div class="stage-label stage-idle" id="stageLabel">等待启动</div>
-          <div class="stage-role" id="stageRole"></div>
-          <div class="stage-file" id="stageFile"></div>
-        </div>
-      </div>
-
-      <!-- Team -->
-      <div class="card">
-        <div class="card-title">AI Team</div>
-        <div class="team-grid" id="teamGrid"></div>
-      </div>
-
-      <!-- Tasks -->
-      <div class="card">
-        <div class="card-title">Tasks</div>
-        <ul class="task-list" id="taskList">
-          <li class="task-empty">等待任务数据...</li>
-        </ul>
+      <div class="input-area">
+        <textarea id="chatInput" rows="1" placeholder="输入你的需求，例如：制作一个打砖块游戏..."></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">发送</button>
       </div>
     </div>
-  </div>
 
-  <!-- ── LLM Output Panel ────────────────────────────────────── -->
-  <div class="llm-panel" id="llmPanel">
-    <div class="llm-toggle" onclick="toggleLLM()">
-      <div class="llm-toggle-left">
-        <div class="llm-toggle-dot" id="llmDot"></div>
-        <span class="llm-toggle-label">LLM Output</span>
+    <!-- Right: Code Preview -->
+    <div class="right-panel">
+      <div class="right-placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+        <p>代码预览</p>
+        <span>即将上线</span>
       </div>
-      <svg class="llm-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
-    </div>
-    <div class="llm-body">
-      <div class="llm-scroll" id="llmScroll"></div>
     </div>
   </div>
 </div>
 
 <script>
-/* ── Constants & State ─────────────────────────────────────────── */
+/* ── Constants ────────────────────────────────────────────────────── */
 const WS_URL = "ws://127.0.0.1:8766";
 const TEAM = [
-  { id:"Mike",  role:"TeamLeader",      color:"#4f8cff", initial:"M" },
-  { id:"Alice", role:"ProductManager",   color:"#f472b6", initial:"A" },
-  { id:"Bob",   role:"Architect",        color:"#a78bfa", initial:"B" },
-  { id:"Alex",  role:"Engineer2",        color:"#fb923c", initial:"X" },
-  { id:"Dana",  role:"DataAnalyst",      color:"#34d399", initial:"D" },
+  {id:"Mike",  role:"TeamLeader",    color:"#4f8cff", initial:"M"},
+  {id:"Alice", role:"ProductManager", color:"#f472b6", initial:"A"},
+  {id:"Bob",   role:"Architect",     color:"#a78bfa", initial:"B"},
+  {id:"Alex",  role:"Engineer",      color:"#fb923c", initial:"X"},
+  {id:"Dana",  role:"DataAnalyst",   color:"#34d399", initial:"D"},
+  {id:"Eve",   role:"QA",           color:"#fbbf24", initial:"E"},
+  {id:"David", role:"Developer",     color:"#2dd4bf", initial:"V"},
 ];
-const STAGE_MAP = {
-  "Thought:react":"角色思考中","Thought:classify":"意图分类中",
-  "Thought:quick":"快速回答中","Thought:search":"搜索增强中",
-  "Docs:prd":"撰写需求文档","Docs:design":"撰写系统设计","Docs:task":"撰写任务列表",
-  "Editor:code":"编写代码","Terminal:cmd":"执行终端命令","Task:object":"任务状态更新",
-};
-const TYPE_CLASS = {
-  thought:"type-thought",docs:"type-docs",editor:"type-editor",
-  terminal:"type-terminal",task:"type-task",info:"type-log",warning:"type-warning",log:"type-log",
-};
-let ws, llmBuffer = "", feedCount = 0, activeRole = null;
+const ROLE_COLOR = {};
+const ROLE_INITIAL = {};
+TEAM.forEach(m => { ROLE_COLOR[m.id] = m.color; ROLE_INITIAL[m.id] = m.initial; });
 
-/* ── Init Team Grid ───────────────────────────────────────────── */
-(function initTeam(){
-  const grid = document.getElementById("teamGrid");
-  TEAM.forEach(m => {
-    const div = document.createElement("div");
-    div.className = "team-member";
-    div.id = "team-" + m.id;
-    div.innerHTML =
-      `<div class="team-avatar" style="background:${m.color};color:#fff">${m.initial}</div>` +
-      `<div class="team-name">${m.id}<br><span style="opacity:0.6;font-size:0.58rem">${m.role}</span></div>`;
-    grid.appendChild(div);
-  });
-})();
+/* ── State ────────────────────────────────────────────────────────── */
+let ws, metagptRunning = false, currentProjectId = null;
+let llmBuffer = "", thinkingEl = null;
 
-/* ── Helpers ───────────────────────────────────────────────────── */
+/* ── Helpers ──────────────────────────────────────────────────────── */
 function now(){ return new Date().toLocaleTimeString("zh-CN",{hour12:false}) }
+function escHtml(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
 
-function roleColor(name){
-  const m = TEAM.find(t => t.id === name || t.role === name);
-  return m ? m.color : "#64748b";
-}
-function roleInitial(name){
-  const m = TEAM.find(t => t.id === name || t.role === name);
-  return m ? m.initial : (name ? name[0].toUpperCase() : "?");
+function renderMarkdown(text){
+  // Code blocks
+  let html = escHtml(text);
+  html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code}</code></pre>`);
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  return html;
 }
 
-function setActiveTeam(roleName){
-  if(!roleName) return;
-  document.querySelectorAll(".team-member").forEach(el => el.classList.remove("active"));
-  const found = TEAM.find(t => t.id === roleName || t.role === roleName);
-  if(found){
-    const el = document.getElementById("team-" + found.id);
-    if(el) el.classList.add("active");
-    activeRole = found.id;
+/* ── Chat Message Rendering ───────────────────────────────────────── */
+function addChatMessage(role, text, type){
+  const empty = document.getElementById("chatEmpty");
+  if(empty) empty.remove();
+  removeThinking();
+
+  const scroll = document.getElementById("chatScroll");
+  const wrap = document.createElement("div");
+
+  if(type === "system"){
+    wrap.className = "chat-msg system";
+    wrap.innerHTML = `<div class="chat-bubble">${renderMarkdown(text)}</div>`;
+  } else if(type === "user"){
+    wrap.className = "chat-msg user";
+    wrap.innerHTML =
+      `<div class="chat-avatar" style="background:var(--accent)">U</div>` +
+      `<div><div class="chat-bubble">${renderMarkdown(text)}</div>` +
+      `<div class="chat-time" style="text-align:right">${now()}</div></div>`;
+  } else {
+    const c = ROLE_COLOR[role] || "#64748b";
+    const ini = ROLE_INITIAL[role] || (role ? role[0].toUpperCase() : "?");
+    wrap.className = "chat-msg role";
+    wrap.innerHTML =
+      `<div class="chat-avatar" style="background:${c}">${ini}</div>` +
+      `<div><div class="chat-sender" style="color:${c}">${escHtml(role||"System")}</div>` +
+      `<div class="chat-bubble">${renderMarkdown(text)}</div>` +
+      `<div class="chat-time">${now()}</div></div>`;
+  }
+  scroll.appendChild(wrap);
+  while(scroll.children.length > 300) scroll.removeChild(scroll.firstChild);
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+/* ── Thinking Indicator ───────────────────────────────────────────── */
+function showThinking(){
+  if(thinkingEl) return;
+  const scroll = document.getElementById("chatScroll");
+  thinkingEl = document.createElement("div");
+  thinkingEl.className = "thinking-indicator";
+  thinkingEl.innerHTML =
+    `<div class="thinking-dots"><span></span><span></span><span></span></div>` +
+    `<span>AI 思考中...</span>` +
+    `<div class="thinking-content" id="thinkingContent"></div>`;
+  thinkingEl.onclick = () => thinkingEl.classList.toggle("expanded");
+  scroll.appendChild(thinkingEl);
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+function updateThinking(text){
+  if(!thinkingEl) showThinking();
+  const content = thinkingEl.querySelector(".thinking-content");
+  if(content){
+    content.textContent = text.slice(-2000);
   }
 }
 
-/* ── Add Feed Item ────────────────────────────────────────────── */
-function addFeed(type, role, text){
-  const empty = document.getElementById("feedEmpty");
-  if(empty) empty.remove();
-  const scroll = document.getElementById("feedScroll");
-  const item = document.createElement("div");
-  item.className = "feed-item";
-  const c = roleColor(role);
-  const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
-  const typeCls = TYPE_CLASS[type] || "type-log";
-  item.innerHTML =
-    `<div class="feed-avatar" style="background:${c}">${roleInitial(role)}</div>` +
-    `<div class="feed-body">` +
-      `<div class="feed-meta">` +
-        `<span class="feed-role">${role || "System"}</span>` +
-        `<span class="feed-type ${typeCls}">${typeLabel}</span>` +
-        `<span class="feed-time">${now()}</span>` +
-      `</div>` +
-      `<div class="feed-text">${escHtml(text)}</div>` +
-    `</div>`;
-  scroll.appendChild(item);
-  feedCount++;
-  document.getElementById("feedCount").textContent = feedCount + " events";
-  while(scroll.children.length > 200) scroll.removeChild(scroll.firstChild);
-  scroll.scrollTop = scroll.scrollHeight;
-  if(role) setActiveTeam(role);
+function removeThinking(){
+  if(thinkingEl){ thinkingEl.remove(); thinkingEl = null; }
 }
 
-function escHtml(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
-
-/* ── Update Stage ─────────────────────────────────────────────── */
-function updateStage(key, role, file){
-  const card = document.getElementById("stageCard");
-  const label = document.getElementById("stageLabel");
-  const roleEl = document.getElementById("stageRole");
-  const fileEl = document.getElementById("stageFile");
-  label.textContent = STAGE_MAP[key] || key;
-  label.classList.remove("stage-idle");
-  card.classList.add("active");
-  if(role){ roleEl.textContent = role; setActiveTeam(role); }
-  if(file) fileEl.textContent = file;
-  else if(key !== "Task:object") fileEl.textContent = "";
-}
-
-/* ── Render Tasks ─────────────────────────────────────────────── */
-function renderTasks(tasks, currentId){
-  const ul = document.getElementById("taskList");
-  ul.innerHTML = "";
-  tasks.forEach(t => {
-    const li = document.createElement("li");
-    const done = t.is_finished || t.status === "finished";
-    const cur = t.task_id === currentId;
-    li.className = "task-item" + (cur ? " current" : "") + (done ? " finished" : "");
-    li.innerHTML =
-      `<div class="task-icon"></div>` +
-      `<div class="task-text">${escHtml(t.instruction || t.task_id || JSON.stringify(t))}</div>` +
-      (cur ? `<span class="task-badge">进行中</span>` : "");
-    ul.appendChild(li);
-  });
-}
-
-/* ── Toggle LLM Panel ─────────────────────────────────────────── */
-function toggleLLM(){
-  document.getElementById("llmPanel").classList.toggle("open");
-}
-
-/* ── WebSocket Message Handler ─────────────────────────────────── */
+/* ── WebSocket Message Handler ────────────────────────────────────── */
 function handleMessage(data){
   const block = data.block || "";
   const name  = data.name  || "";
   const value = data.value;
   const role  = data.role  || "";
 
-  // Control messages (start/finish/error from server)
+  // Control messages
   if(block === "Control" && name === "status"){
-    const btn = document.getElementById("startBtn");
-    const input = document.getElementById("ideaInput");
+    const btn = document.getElementById("sendBtn");
+    const input = document.getElementById("chatInput");
     if(value === "running"){
+      metagptRunning = true;
       btn.textContent = "运行中...";
       btn.disabled = true;
-      input.disabled = true;
     } else {
-      btn.textContent = "启动";
+      metagptRunning = false;
+      btn.textContent = "发送";
       btn.disabled = false;
-      input.disabled = false;
+      removeThinking();
       if(value === "finished"){
-        addFeed("log", "System", "MetaGPT 运行完成");
-        updateStage("finished", null, "");
-        document.getElementById("stageLabel").textContent = "运行完成";
+        addChatMessage(null, "MetaGPT 运行完成", "system");
       } else if(value === "error"){
-        addFeed("warning", "System", "MetaGPT 运行出错");
+        addChatMessage(null, "MetaGPT 运行出错", "system");
       }
     }
     return;
@@ -552,85 +420,70 @@ function handleMessage(data){
   // LLM streaming tokens
   if(name === "content" && typeof value === "string"){
     llmBuffer += value;
-    const box = document.getElementById("llmScroll");
-    box.textContent = llmBuffer.slice(-3000);
-    box.scrollTop = box.scrollHeight;
-    document.getElementById("llmDot").classList.add("streaming");
+    showThinking();
+    updateThinking(llmBuffer);
     return;
   }
 
-  // end_marker: LLM stream finished
+  // LLM stream end
   if(name === "end_marker"){
     llmBuffer = "";
-    document.getElementById("llmDot").classList.remove("streaming");
+    removeThinking();
     return;
   }
 
   // Task list update
   if(block === "Task" && name === "object" && value && value.tasks){
-    renderTasks(value.tasks, value.current_task_id);
-    updateStage("Task:object", role, "");
-    addFeed("task", role || "System", "任务状态更新 — 当前: " + (value.current_task_id || "—"));
+    addChatMessage(role || "System", "任务状态更新 — 当前: " + (value.current_task_id || "—"), "role");
     return;
   }
 
   // Thought events
   if(block === "Thought" && name === "object" && value){
-    const type  = value.type  || "";
+    const type = value.type || "";
     const stage = value.stage || "";
-    const key   = "Thought:" + type;
-    updateStage(key, role, "");
-    addFeed("thought", role, (STAGE_MAP[key] || key) + (stage ? " / " + stage : ""));
+    const labels = {"react":"思考中","classify":"意图分类","quick":"快速回答","search":"搜索增强"};
+    addChatMessage(role, (labels[type] || type) + (stage ? " / " + stage : ""), "role");
     return;
   }
 
-  // Docs events (PRD / Design / Task)
+  // Docs events
   if(block === "Docs"){
     if(name === "meta" && value && value.type){
-      const key = "Docs:" + value.type;
-      updateStage(key, role, "");
-      addFeed("docs", role || "Alice", STAGE_MAP[key] || key);
+      const labels = {"prd":"需求文档","design":"系统设计","task":"任务列表"};
+      addChatMessage(role || "Alice", "正在撰写" + (labels[value.type] || value.type) + "...", "role");
     } else if(name === "path"){
       const filename = String(value).split(/[\\/]/).pop();
-      document.getElementById("stageFile").textContent = filename;
-      addFeed("docs", role || "System", "文档已保存: " + filename);
+      addChatMessage(role || "System", "文档已保存: " + filename, "role");
     }
     return;
   }
 
-  // Editor events (code writing)
+  // Editor events
   if(block === "Editor"){
     if(name === "meta" && value && value.filename){
-      updateStage("Editor:code", role, value.filename);
-      addFeed("editor", role || "Alex", "正在编写: " + value.filename);
+      addChatMessage(role || "Alex", "正在编写: " + value.filename, "role");
     } else if(name === "path"){
       const filename = String(value).split(/[\\/]/).pop();
-      addFeed("editor", role || "Alex", "代码已保存: " + filename);
+      addChatMessage(role || "Alex", "代码已保存: " + filename, "role");
     }
     return;
   }
 
   // Terminal events
   if(block === "Terminal" && name === "cmd"){
-    const cmd = String(value).trim().slice(0, 80);
-    updateStage("Terminal:cmd", role, cmd.slice(0, 60));
-    addFeed("terminal", role || "Alex", "$ " + cmd);
+    addChatMessage(role || "Alex", "$ " + String(value).trim().slice(0,80), "role");
     return;
   }
 
-  // Logger intercepted text
+  // Log messages
   if(block === "Log"){
-    const level = name === "warning" ? "warning" : "info";
-    addFeed(level, role || "System", value);
-    if(value.includes("New requirement detected")) updateStage("Docs:prd", null, "");
-    if(value.includes("Writing ")){
-      updateStage("Editor:code", null, value.replace("Writing ","").replace("..","").trim());
-    }
+    addChatMessage(role || "System", value, "role");
     return;
   }
 }
 
-/* ── WebSocket Connection ─────────────────────────────────────── */
+/* ── WebSocket Connection ─────────────────────────────────────────── */
 function connect(){
   ws = new WebSocket(WS_URL);
   const dot  = document.getElementById("connDot");
@@ -639,56 +492,126 @@ function connect(){
   ws.onopen = () => {
     dot.classList.add("on");
     text.textContent = "已连接";
-    addFeed("log", "System", "WebSocket 已连接，等待 MetaGPT 启动...");
+    addChatMessage(null, "已连接到 MetaGPT 服务，请输入需求开始", "system");
   };
 
   ws.onmessage = (e) => {
     try { handleMessage(JSON.parse(e.data)); }
-    catch(err){ addFeed("warning", "System", "消息解析失败: " + e.data.slice(0,100)); }
+    catch(err){ addChatMessage(null, "消息解析失败", "system"); }
   };
 
   ws.onclose = () => {
     dot.classList.remove("on");
-    text.textContent = "已断开，5s 后重连";
+    text.textContent = "已断开";
     setTimeout(connect, 5000);
   };
 
   ws.onerror = () => ws.close();
 }
-
 connect();
 
-/* ── Start MetaGPT ────────────────────────────────────────────── */
-function startMetaGPT(){
-  const input = document.getElementById("ideaInput");
-  const btn = document.getElementById("startBtn");
+/* ── Send / Start ─────────────────────────────────────────────────── */
+function sendMessage(){
+  const input = document.getElementById("chatInput");
+  const btn = document.getElementById("sendBtn");
   const idea = input.value.trim();
   if(!idea) return;
+
+  addChatMessage(null, idea, "user");
+  input.value = "";
+  input.style.height = "auto";
+
+  if(metagptRunning){
+    addChatMessage(null, "MetaGPT 正在运行中，用户回复功能开发中...", "system");
+    return;
+  }
+
   btn.textContent = "提交中...";
   btn.disabled = true;
   fetch("/start", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({idea: idea})
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({idea: idea})
   }).then(r => r.json()).then(data => {
     if(data.error){
-      addFeed("warning", "System", data.error);
-      btn.textContent = "启动";
+      addChatMessage(null, data.error, "system");
+      btn.textContent = "发送";
       btn.disabled = false;
     }
   }).catch(err => {
-    addFeed("warning", "System", "请求失败: " + err.message);
-    btn.textContent = "启动";
+    addChatMessage(null, "请求失败: " + err.message, "system");
+    btn.textContent = "发送";
     btn.disabled = false;
   });
 }
 
-document.getElementById("ideaInput").addEventListener("keydown", function(e){
+/* ── Input: Enter/Shift+Enter & Auto-resize ───────────────────────── */
+const chatInput = document.getElementById("chatInput");
+chatInput.addEventListener("keydown", function(e){
   if(e.key === "Enter" && !e.shiftKey){
     e.preventDefault();
-    startMetaGPT();
+    sendMessage();
   }
 });
+chatInput.addEventListener("input", function(){
+  this.style.height = "auto";
+  this.style.height = Math.min(this.scrollHeight, 120) + "px";
+});
+
+/* ── Project Sidebar ──────────────────────────────────────────────── */
+function loadProjects(){
+  fetch("/api/projects").then(r => r.json()).then(data => {
+    const list = document.getElementById("projectList");
+    list.innerHTML = "";
+    (data.projects || []).forEach(p => {
+      const div = document.createElement("div");
+      div.className = "project-item" + (p.id === currentProjectId ? " active" : "");
+      let timeStr = "";
+      if(p.timestamp){
+        try {
+          const ts = parseInt(p.timestamp);
+          if(!isNaN(ts)) timeStr = new Date(ts * 1000).toLocaleString("zh-CN");
+        } catch(e){}
+      }
+      div.innerHTML = `<div class="p-name">${escHtml(p.name)}</div>` +
+        (timeStr ? `<div class="p-time">${timeStr}</div>` : "");
+      div.onclick = () => selectProject(p.id);
+      list.appendChild(div);
+    });
+  }).catch(() => {});
+}
+
+function selectProject(id){
+  currentProjectId = id;
+  document.querySelectorAll(".project-item").forEach(el => el.classList.remove("active"));
+  const items = document.querySelectorAll(".project-item");
+  items.forEach(el => {
+    if(el.querySelector(".p-name").textContent === id || el.dataset.id === id)
+      el.classList.add("active");
+  });
+  loadProjects();
+}
+
+function newProject(){
+  currentProjectId = null;
+  document.getElementById("chatScroll").innerHTML =
+    `<div class="chat-empty" id="chatEmpty">` +
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>` +
+    `<p>输入需求，开始与 AI 团队协作</p></div>`;
+  document.getElementById("chatInput").focus();
+}
+
+loadProjects();
+
+/* ── Panel Toggle ─────────────────────────────────────────────────── */
+function toggleLeft(){
+  document.getElementById("mainGrid").classList.toggle("left-collapsed");
+  document.getElementById("toggleLeft").classList.toggle("active");
+}
+function toggleRight(){
+  document.getElementById("mainGrid").classList.toggle("right-open");
+  document.getElementById("toggleRight").classList.toggle("active");
+}
 </script>
 </body>
 </html>

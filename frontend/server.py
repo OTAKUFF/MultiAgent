@@ -7,6 +7,7 @@ MetaGPT 前端服务器（subprocess 方案）
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -17,13 +18,14 @@ import websockets
 FRONTEND_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(FRONTEND_DIR)
 
-# 找到 metagpt 所在的 python 解释器
 PYTHON_EXE = sys.executable
 
 ws_clients: set = set()
 ws_loop: asyncio.AbstractEventLoop = None
 metagpt_running: bool = False
 metagpt_proc: subprocess.Popen = None
+
+KNOWN_ROLES = ["Mike", "Alice", "Bob", "Alex", "Dana", "Eve", "David"]
 
 
 # ─── 广播到所有 WebSocket 客户端 ─────────────────────────────────────────────
@@ -44,15 +46,78 @@ def _broadcast_control(status: str):
     _broadcast({"block": "Control", "name": "status", "value": status})
 
 
-def _broadcast_line(line: str):
-    _broadcast({"block": "Log", "name": "info", "value": line, "role": None})
+def _broadcast_message(role: str, text: str):
+    """发送一整块角色消息到前端"""
+    _broadcast({"block": "Log", "name": "info", "value": text, "role": role})
+
+
+# ─── 解析角色名 ──────────────────────────────────────────────────────────────
+
+def _detect_role(line: str):
+    """从一行输出中检测角色名，返回 (role, is_new_speaker)"""
+    # 匹配 "Mike：" 或 "Alice:" 开头（中英文冒号）
+    for name in KNOWN_ROLES:
+        if line.startswith(name + "：") or line.startswith(name + ":"):
+            return name, True
+        if line.startswith(name + "(") or line.startswith(name + "（"):
+            return name, True
+    # loguru 日志行中检测角色，如 "metagpt.roles.xxx - Mike(TeamLeader)"
+    for name in KNOWN_ROLES:
+        if name in line:
+            return name, False
+    return None, False
+
+
+# ─── 输出缓冲器：攒同一角色的连续输出，合并成一块发送 ─────────────────────────
+
+class OutputBuffer:
+    def __init__(self):
+        self._role = None
+        self._lines = []
+        self._timer = None
+        self._lock = threading.Lock()
+        self.FLUSH_DELAY = 0.8  # 0.8秒没有新输出就刷新
+
+    def add_line(self, line: str):
+        with self._lock:
+            role, is_new_speaker = _detect_role(line)
+            # 如果检测到新角色开始说话，先刷新之前的缓冲
+            if is_new_speaker and self._lines and role != self._role:
+                self._flush_locked()
+            # 更新当前角色
+            if role:
+                self._role = role
+            self._lines.append(line)
+            # 重置定时器
+            if self._timer:
+                self._timer.cancel()
+            self._timer = threading.Timer(self.FLUSH_DELAY, self._flush)
+            self._timer.start()
+
+    def _flush(self):
+        with self._lock:
+            self._flush_locked()
+
+    def _flush_locked(self):
+        if not self._lines:
+            return
+        text = "\n".join(self._lines)
+        role = self._role or "System"
+        self._lines = []
+        # 不重置 self._role，后续无角色的行继续归属当前角色
+        _broadcast_message(role, text)
+
+    def flush_final(self):
+        if self._timer:
+            self._timer.cancel()
+        self._flush()
 
 
 # ─── 子进程运行 MetaGPT ──────────────────────────────────────────────────────
 def _run_metagpt(idea: str):
     global metagpt_running, metagpt_proc
+    buf = OutputBuffer()
     try:
-        # 跟命令行一样：metagpt "需求"
         metagpt_exe = os.path.join(os.path.dirname(PYTHON_EXE), "metagpt")
         cmd = [metagpt_exe, idea]
         metagpt_proc = subprocess.Popen(
@@ -60,7 +125,7 @@ def _run_metagpt(idea: str):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            encoding="utf-8",
+            encoding="gbk",
             errors="replace",
             cwd=PROJECT_DIR,
             bufsize=1,
@@ -68,16 +133,18 @@ def _run_metagpt(idea: str):
         for line in metagpt_proc.stdout:
             line = line.rstrip("\n\r")
             if line:
-                print(line)  # 同时打印到服务器控制台
-                _broadcast_line(line)
+                print(line)
+                buf.add_line(line)
+        buf.flush_final()
         metagpt_proc.wait()
         if metagpt_proc.returncode == 0:
             _broadcast_control("finished")
         else:
-            _broadcast_line(f"metagpt 退出码: {metagpt_proc.returncode}")
+            _broadcast_message("System", f"metagpt 退出码: {metagpt_proc.returncode}")
             _broadcast_control("error")
     except Exception as e:
-        _broadcast_line(f"启动 metagpt 失败: {e}")
+        buf.flush_final()
+        _broadcast_message("System", f"启动 metagpt 失败: {e}")
         _broadcast_control("error")
     finally:
         metagpt_running = False
@@ -102,9 +169,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(404)
                 self.end_headers()
                 self.wfile.write(b"index.html not found")
+        elif self.path == "/api/projects":
+            self._handle_projects()
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _handle_projects(self):
+        workspace = os.path.join(PROJECT_DIR, "workspace")
+        projects = []
+        skip = {"storage", "__pycache__"}
+        if os.path.isdir(workspace):
+            for name in os.listdir(workspace):
+                full = os.path.join(workspace, name)
+                if not os.path.isdir(full):
+                    continue
+                if name in skip or name.startswith("-") or name.startswith("."):
+                    continue
+                # parse {project_name}_{timestamp} pattern
+                parts = name.rsplit("_", 1)
+                proj_name = parts[0] if len(parts) == 2 and parts[1].isdigit() else name
+                timestamp = parts[1] if len(parts) == 2 and parts[1].isdigit() else ""
+                projects.append({"id": name, "name": proj_name, "timestamp": timestamp})
+        projects.sort(key=lambda p: p["timestamp"], reverse=True)
+        self._json(200, {"projects": projects})
 
     def do_POST(self):
         if self.path == "/start":
