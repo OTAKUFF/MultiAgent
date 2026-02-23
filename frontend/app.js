@@ -20,6 +20,9 @@ let projects = [];          // all project objects
 let activeProjectId = null; // currently selected project id (null = new project mode)
 let previewMode = null;     // null | "viewer" | "editor"
 let isResizing = false;
+let menuTargetId = null;    // project id for context menu
+let openTabs = [];          // [{filePath, fileName, treeItem}]
+let activeTabPath = null;
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 function now(){ return new Date().toLocaleTimeString("zh-CN",{hour12:false}); }
@@ -157,13 +160,68 @@ function renderProjectList(){
     const statusLabel = p.status === "running" ? "运行中" : (p.status === "error" ? "出错" : "");
     const statusClass = p.status === "running" ? "" : (p.status === "error" ? "error" : "done");
     div.innerHTML =
+      `<div class="p-info">` +
       `<div class="p-name">${escHtml(p.name)}</div>` +
       (timeStr ? `<div class="p-time">${timeStr}</div>` : "") +
-      (statusLabel ? `<div class="p-status ${statusClass}">${statusLabel}</div>` : "");
+      (statusLabel ? `<div class="p-status ${statusClass}">${statusLabel}</div>` : "") +
+      `</div>` +
+      `<button class="p-menu-btn" data-pid="${escHtml(p.id)}"><span></span><span></span><span></span></button>`;
+    div.querySelector(".p-menu-btn").onclick = function(e){
+      e.stopPropagation();
+      showProjectMenu(e, p.id);
+    };
     div.onclick = () => switchProject(p.id);
     list.appendChild(div);
   });
 }
+
+/* ── Project Context Menu ────────────────────────────────────────── */
+function showProjectMenu(e, projectId){
+  menuTargetId = projectId;
+  const menu = document.getElementById("projectContextMenu");
+  const btn = e.currentTarget;
+  const rect = btn.getBoundingClientRect();
+  menu.style.top = rect.bottom + 4 + "px";
+  menu.style.left = rect.left + "px";
+  menu.classList.add("show");
+  btn.classList.add("open");
+}
+function hideProjectMenu(){
+  const menu = document.getElementById("projectContextMenu");
+  menu.classList.remove("show");
+  menuTargetId = null;
+  document.querySelectorAll(".p-menu-btn.open").forEach(b => b.classList.remove("open"));
+}
+function renameProject(){
+  const id = menuTargetId;
+  hideProjectMenu();
+  const proj = projects.find(p => p.id === id);
+  if(!proj) return;
+  const newName = prompt("输入新名称:", proj.name);
+  if(newName !== null && newName.trim()){
+    proj.name = newName.trim();
+    renderProjectList();
+  }
+}
+function deleteProject(){
+  const id = menuTargetId;
+  hideProjectMenu();
+  const proj = projects.find(p => p.id === id);
+  if(!proj) return;
+  if(!confirm("确定删除项目「" + proj.name + "」？")) return;
+  projects = projects.filter(p => p.id !== id);
+  if(activeProjectId === id){
+    activeProjectId = null;
+    newProject();
+  }
+  renderProjectList();
+}
+document.addEventListener("click", function(e){
+  const menu = document.getElementById("projectContextMenu");
+  if(menu && !menu.contains(e.target) && !e.target.closest(".p-menu-btn")){
+    hideProjectMenu();
+  }
+});
 
 /* ── Chat Rendering ──────────────────────────────────────────────── */
 function addChatMessage(role, text, type){
@@ -579,6 +637,9 @@ function loadCodeEditor(proj){
   const content = document.getElementById("codeContent");
   tree.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:0.8rem">加载中...</div>';
   content.innerHTML = '<div class="no-file">选择文件查看代码</div>';
+  openTabs = [];
+  activeTabPath = null;
+  renderTabs();
 
   fetch("/api/project-files?path=" + encodeURIComponent(proj.path))
     .then(r => r.json())
@@ -638,6 +699,17 @@ function renderFileTree(entries, container, depth, projPath){
 }
 
 function loadFileContent(filePath, treeItem){
+  // Manage tabs
+  const fileName = filePath.split("/").pop();
+  const existing = openTabs.find(t => t.filePath === filePath);
+  if(existing){
+    existing.treeItem = treeItem || existing.treeItem;
+  } else {
+    openTabs.push({ filePath, fileName, treeItem });
+  }
+  activeTabPath = filePath;
+  renderTabs();
+
   // Highlight active item
   document.querySelectorAll(".file-tree-item.active").forEach(el => el.classList.remove("active"));
   if(treeItem) treeItem.classList.add("active");
@@ -672,6 +744,55 @@ function loadFileContent(filePath, treeItem){
     .catch(() => {
       content.innerHTML = '<div class="no-file">加载失败</div>';
     });
+}
+
+/* ── Editor Tabs ─────────────────────────────────────────────────── */
+function renderTabs(){
+  const container = document.getElementById("editorTabs");
+  if(!container) return;
+  container.innerHTML = "";
+  openTabs.forEach(tab => {
+    const el = document.createElement("div");
+    el.className = "editor-tab" + (tab.filePath === activeTabPath ? " active" : "");
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = tab.fileName;
+    el.appendChild(nameSpan);
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "tab-close";
+    closeBtn.innerHTML = "&times;";
+    closeBtn.onclick = function(e){
+      e.stopPropagation();
+      closeTab(tab.filePath);
+    };
+    el.appendChild(closeBtn);
+    el.onclick = function(){ switchTab(tab.filePath); };
+    container.appendChild(el);
+  });
+}
+
+function switchTab(filePath){
+  const tab = openTabs.find(t => t.filePath === filePath);
+  if(!tab) return;
+  loadFileContent(tab.filePath, tab.treeItem);
+}
+
+function closeTab(filePath){
+  const idx = openTabs.findIndex(t => t.filePath === filePath);
+  if(idx === -1) return;
+  openTabs.splice(idx, 1);
+  if(activeTabPath === filePath){
+    if(openTabs.length > 0){
+      const next = openTabs[Math.min(idx, openTabs.length - 1)];
+      loadFileContent(next.filePath, next.treeItem);
+    } else {
+      activeTabPath = null;
+      renderTabs();
+      const content = document.getElementById("codeContent");
+      content.innerHTML = '<div class="no-file">选择文件查看代码</div>';
+    }
+  } else {
+    renderTabs();
+  }
 }
 
 /* ── Resize Handle ───────────────────────────────────────────────── */

@@ -109,14 +109,39 @@ body::before{
 .project-item{
   padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;
   margin-bottom:2px;transition:all 0.2s;
+  position:relative;display:flex;align-items:flex-start;gap:4px;
 }
 .project-item:hover{background:var(--bg-card-hover)}
 .project-item.active{background:var(--accent-glow);border:1px solid var(--border-active)}
-.project-item .p-name{font-size:0.82rem;font-weight:500;color:var(--text-primary);margin-bottom:2px}
+.project-item .p-info{flex:1;min-width:0}
+.project-item .p-name{font-size:0.82rem;font-weight:500;color:var(--text-primary);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .project-item .p-time{font-size:0.68rem;color:var(--text-muted);font-family:var(--font-mono)}
 .project-item .p-status{font-size:0.65rem;color:var(--accent)}
 .project-item .p-status.done{color:var(--dana)}
 .project-item .p-status.error{color:#ef4444}
+.p-menu-btn{
+  flex-shrink:0;width:22px;height:22px;border:none;background:none;
+  cursor:pointer;border-radius:4px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+  opacity:0;transition:opacity 0.15s,background 0.15s;
+}
+.project-item:hover .p-menu-btn,.p-menu-btn.open{opacity:1}
+.p-menu-btn:hover{background:var(--bg-card-hover)}
+.p-menu-btn span{display:block;width:3px;height:3px;border-radius:50%;background:var(--text-secondary)}
+.p-context-menu{
+  position:fixed;z-index:1000;min-width:120px;
+  background:var(--bg-base);border:1px solid var(--border);
+  border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);
+  padding:4px;display:none;
+}
+.p-context-menu.show{display:block}
+.p-context-menu-item{
+  padding:7px 12px;font-size:0.78rem;border-radius:5px;cursor:pointer;
+  color:var(--text-primary);transition:background 0.1s;
+}
+.p-context-menu-item:hover{background:var(--bg-card-hover)}
+.p-context-menu-item.danger{color:#ef4444}
+.p-context-menu-item.danger:hover{background:rgba(239,68,68,0.08)}
 .new-project-btn{
   margin:8px;padding:10px;border-radius:var(--radius-sm);
   border:1px dashed var(--border);background:none;
@@ -224,7 +249,33 @@ body::before{
   background:#f7f8fa;
 }
 /* ── Code Editor ───────────────────────────────────────────────── */
-.code-editor{flex:1;display:grid;grid-template-columns:180px 1fr;overflow:hidden}
+.code-editor{
+  flex:1;display:grid;grid-template-columns:180px 1fr;
+  grid-template-rows:auto 1fr;overflow:hidden;
+}
+.editor-tabs{
+  grid-column:2;grid-row:1;display:flex;align-items:center;
+  overflow-x:auto;overflow-y:hidden;background:rgba(243,244,246,0.6);
+  border-bottom:1px solid var(--border);min-height:0;
+}
+.editor-tabs::-webkit-scrollbar{height:2px}
+.editor-tabs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.editor-tabs:empty{display:none}
+.editor-tab{
+  display:flex;align-items:center;gap:6px;padding:6px 12px;
+  font-size:0.73rem;color:var(--text-secondary);cursor:pointer;
+  border-right:1px solid var(--border);white-space:nowrap;
+  transition:background 0.1s,color 0.1s;flex-shrink:0;
+}
+.editor-tab:hover{background:rgba(255,255,255,0.8);color:var(--text-primary)}
+.editor-tab.active{background:#fff;color:var(--accent);font-weight:500;box-shadow:inset 0 -2px 0 var(--accent)}
+.editor-tab .tab-close{
+  width:16px;height:16px;border:none;background:none;cursor:pointer;
+  border-radius:3px;font-size:0.7rem;color:var(--text-muted);
+  display:grid;place-items:center;transition:all 0.1s;line-height:1;
+}
+.editor-tab .tab-close:hover{background:rgba(0,0,0,0.08);color:var(--text-primary)}
+.file-tree{grid-row:1 / -1}
 .file-tree{
   overflow-y:auto;border-right:1px solid var(--border);padding:8px 0;
   background:rgba(247,248,250,0.8);
@@ -293,6 +344,10 @@ body::before{
       <div class="left-header"><span class="left-title">项目</span></div>
       <div class="project-list" id="projectList"></div>
       <button class="new-project-btn" onclick="newProject()">+ 新建项目</button>
+      <div class="p-context-menu" id="projectContextMenu">
+        <div class="p-context-menu-item" onclick="renameProject()">重命名</div>
+        <div class="p-context-menu-item danger" onclick="deleteProject()">删除</div>
+      </div>
     </div>
     <div class="chat-col">
       <div class="chat-scroll" id="chatScroll">
@@ -318,6 +373,7 @@ body::before{
       </div>
       <div class="code-editor" id="codeEditor" style="display:none">
         <div class="file-tree" id="fileTree"></div>
+        <div class="editor-tabs" id="editorTabs"></div>
         <div class="code-content" id="codeContent"><div class="no-file">选择文件查看代码</div></div>
       </div>
     </div>
