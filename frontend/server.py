@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import threading
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import websockets
@@ -26,6 +27,73 @@ metagpt_running: bool = False
 metagpt_proc: subprocess.Popen = None
 
 KNOWN_ROLES = ["Mike", "Alice", "Bob", "Alex", "Dana", "Eve", "David"]
+
+MIME_MAP = {
+    ".html": "text/html", ".js": "application/javascript",
+    ".css": "text/css", ".json": "application/json",
+    ".svg": "image/svg+xml", ".png": "image/png",
+    ".jpg": "image/jpeg", ".gif": "image/gif",
+    ".ico": "image/x-icon", ".woff2": "font/woff2",
+    ".woff": "font/woff", ".ttf": "font/ttf",
+    ".map": "application/json", ".py": "text/x-python",
+    ".ts": "text/typescript", ".tsx": "text/typescript",
+    ".jsx": "text/javascript", ".md": "text/markdown",
+}
+
+SKIP_DIRS = {"node_modules", "__pycache__", ".git", ".venv", "venv", ".idea", ".vscode"}
+
+
+def _safe_resolve(base_dir, relative_path):
+    """路径安全校验，防目录穿越"""
+    base = os.path.realpath(base_dir)
+    target = os.path.realpath(os.path.join(base_dir, relative_path))
+    if not target.startswith(base + os.sep) and target != base:
+        return None
+    return target
+
+
+def _detect_project_type(project_path):
+    """检测项目类型：web_built / web_static / web_unbuilt / python / empty"""
+    if not os.path.isdir(project_path):
+        return {"type": "empty", "serve_root": ""}
+    dist_index = os.path.join(project_path, "dist", "index.html")
+    root_index = os.path.join(project_path, "index.html")
+    if os.path.isfile(dist_index):
+        return {"type": "web_built", "serve_root": os.path.join(project_path, "dist")}
+    if os.path.isfile(root_index):
+        return {"type": "web_static", "serve_root": project_path}
+    if os.path.isfile(os.path.join(project_path, "package.json")):
+        return {"type": "web_unbuilt", "serve_root": ""}
+    try:
+        if any(f.endswith(".py") for f in os.listdir(project_path)):
+            return {"type": "python", "serve_root": ""}
+    except OSError:
+        pass
+    return {"type": "empty", "serve_root": ""}
+
+
+def _build_file_tree(dir_path, rel_prefix=""):
+    """递归构建文件树"""
+    entries = []
+    try:
+        items = sorted(os.listdir(dir_path))
+    except OSError:
+        return entries
+    dirs_list = []
+    files_list = []
+    for name in items:
+        if name.startswith("."):
+            continue
+        full = os.path.join(dir_path, name)
+        rel = os.path.join(rel_prefix, name).replace("\\", "/")
+        if os.path.isdir(full):
+            if name in SKIP_DIRS:
+                continue
+            children = _build_file_tree(full, rel)
+            dirs_list.append({"name": name, "path": rel, "type": "dir", "children": children})
+        else:
+            files_list.append({"name": name, "path": rel, "type": "file"})
+    return dirs_list + files_list
 
 
 # ─── 广播到所有 WebSocket 客户端 ─────────────────────────────────────────────
@@ -114,12 +182,17 @@ class OutputBuffer:
 
 
 # ─── 子进程运行 MetaGPT ──────────────────────────────────────────────────────
-def _run_metagpt(idea: str):
+def _run_metagpt(idea: str, project_path: str = ""):
     global metagpt_running, metagpt_proc
     buf = OutputBuffer()
     try:
+        workspace = os.path.join(PROJECT_DIR, "workspace")
+        before = set(os.listdir(workspace)) if os.path.isdir(workspace) else set()
+
         metagpt_exe = os.path.join(os.path.dirname(PYTHON_EXE), "metagpt")
         cmd = [metagpt_exe, idea]
+        if project_path:
+            cmd += ["--project-path", project_path]
         metagpt_proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -137,6 +210,18 @@ def _run_metagpt(idea: str):
                 buf.add_line(line)
         buf.flush_final()
         metagpt_proc.wait()
+
+        # Detect project path after run
+        after = set(os.listdir(workspace)) if os.path.isdir(workspace) else set()
+        new_dirs = after - before
+        detected_path = ""
+        if project_path:
+            detected_path = project_path
+        elif new_dirs:
+            detected_path = os.path.join(workspace, sorted(new_dirs)[-1])
+        if detected_path:
+            _broadcast({"block": "Control", "name": "project_path", "value": detected_path})
+
         if metagpt_proc.returncode == 0:
             _broadcast_control("finished")
         else:
@@ -155,24 +240,143 @@ def _run_metagpt(idea: str):
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
-            filepath = os.path.join(FRONTEND_DIR, "index.html")
-            try:
-                with open(filepath, "rb") as f:
-                    content = f.read()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(content)))
-                self.end_headers()
-                self.wfile.write(content)
-            except FileNotFoundError:
-                self.send_response(404)
-                self.end_headers()
-                self.wfile.write(b"index.html not found")
-        elif self.path == "/api/projects":
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        qs = dict(urllib.parse.parse_qsl(parsed.query))
+
+        if path in ("/", "/index.html"):
+            self._serve_frontend_file("index.html", "text/html; charset=utf-8")
+        elif path == "/app.js":
+            self._serve_frontend_file("app.js", "application/javascript; charset=utf-8")
+        elif path == "/api/projects":
             self._handle_projects()
+        elif path == "/api/project-info":
+            self._handle_project_info(qs)
+        elif path == "/api/project-files":
+            self._handle_project_files(qs)
+        elif path == "/api/file-content":
+            self._handle_file_content(qs)
+        elif path.startswith("/preview/"):
+            self._handle_preview(path)
         else:
             self.send_response(404)
+            self.end_headers()
+
+    def _serve_frontend_file(self, filename, content_type):
+        filepath = os.path.join(FRONTEND_DIR, filename)
+        try:
+            with open(filepath, "rb") as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+        except FileNotFoundError:
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(f"{filename} not found".encode())
+
+    def _handle_project_info(self, qs):
+        proj_path = qs.get("path", "")
+        if not proj_path:
+            self._json(400, {"error": "missing path"})
+            return
+        workspace = os.path.join(PROJECT_DIR, "workspace")
+        real_proj = os.path.realpath(proj_path)
+        real_ws = os.path.realpath(workspace)
+        if not real_proj.startswith(real_ws):
+            self._json(403, {"error": "forbidden"})
+            return
+        info = _detect_project_type(proj_path)
+        self._json(200, info)
+
+    def _handle_project_files(self, qs):
+        proj_path = qs.get("path", "")
+        if not proj_path:
+            self._json(400, {"error": "missing path"})
+            return
+        workspace = os.path.join(PROJECT_DIR, "workspace")
+        real_proj = os.path.realpath(proj_path)
+        real_ws = os.path.realpath(workspace)
+        if not real_proj.startswith(real_ws):
+            self._json(403, {"error": "forbidden"})
+            return
+        files = _build_file_tree(proj_path)
+        self._json(200, {"files": files})
+
+    def _handle_file_content(self, qs):
+        file_path = qs.get("path", "")
+        if not file_path:
+            self._json(400, {"error": "missing path"})
+            return
+        workspace = os.path.join(PROJECT_DIR, "workspace")
+        real_file = os.path.realpath(file_path)
+        real_ws = os.path.realpath(workspace)
+        if not real_file.startswith(real_ws):
+            self._json(403, {"error": "forbidden"})
+            return
+        if not os.path.isfile(file_path):
+            self._json(404, {"error": "file not found"})
+            return
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            self._json(200, {"content": content})
+        except Exception as e:
+            self._json(500, {"error": str(e)})
+
+    def _handle_preview(self, path):
+        # /preview/<dir_name>/rest/of/path
+        parts = path[len("/preview/"):].split("/", 1)
+        if len(parts) < 1:
+            self.send_response(404)
+            self.end_headers()
+            return
+        dir_name = urllib.parse.unquote(parts[0])
+        file_rel = parts[1] if len(parts) > 1 else "index.html"
+        workspace = os.path.join(PROJECT_DIR, "workspace")
+        proj_path = os.path.join(workspace, dir_name)
+        if not os.path.isdir(proj_path):
+            self.send_response(404)
+            self.end_headers()
+            return
+        info = _detect_project_type(proj_path)
+        serve_root = info.get("serve_root", "") or proj_path
+        target = _safe_resolve(serve_root, file_rel)
+        if not target or not os.path.isfile(target):
+            self.send_response(404)
+            self.end_headers()
+            return
+        ext = os.path.splitext(target)[1].lower()
+        mime = MIME_MAP.get(ext, "application/octet-stream")
+        try:
+            with open(target, "rb") as f:
+                content = f.read()
+            # Rewrite absolute asset paths in HTML so they route through /preview/<dir>/
+            if ext == ".html":
+                dir_prefix = b"/preview/" + urllib.parse.quote(dir_name).encode() + b"/"
+                # Replace absolute paths like /assets/, /js/, /css/, /img/, /fonts/, /static/
+                for prefix in [b"/assets/", b"/js/", b"/css/", b"/img/", b"/fonts/", b"/static/"]:
+                    content = content.replace(
+                        b'="' + prefix, b'="' + dir_prefix + prefix[1:]
+                    )
+                    content = content.replace(
+                        b"='" + prefix, b"='" + dir_prefix + prefix[1:]
+                    )
+                    # Also handle src=/href= without quotes (rare but possible)
+                    content = content.replace(
+                        b'(' + prefix, b'(' + dir_prefix + prefix[1:]
+                    )
+                mime = "text/html; charset=utf-8"
+            self.send_response(200)
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(content)
+        except Exception:
+            self.send_response(500)
             self.end_headers()
 
     def _handle_projects(self):
@@ -190,7 +394,7 @@ class Handler(BaseHTTPRequestHandler):
                 parts = name.rsplit("_", 1)
                 proj_name = parts[0] if len(parts) == 2 and parts[1].isdigit() else name
                 timestamp = parts[1] if len(parts) == 2 and parts[1].isdigit() else ""
-                projects.append({"id": name, "name": proj_name, "timestamp": timestamp})
+                projects.append({"id": name, "name": proj_name, "timestamp": timestamp, "path": full})
         projects.sort(key=lambda p: p["timestamp"], reverse=True)
         self._json(200, {"projects": projects})
 
@@ -209,15 +413,18 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length)
         try:
-            idea = json.loads(body).get("idea", "").strip()
+            payload = json.loads(body)
+            idea = payload.get("idea", "").strip()
+            project_path = payload.get("project_path", "").strip()
         except Exception:
             idea = ""
+            project_path = ""
         if not idea:
             self._json(400, {"error": "idea 不能为空"})
             return
         metagpt_running = True
         _broadcast_control("running")
-        threading.Thread(target=_run_metagpt, args=(idea,), daemon=True).start()
+        threading.Thread(target=_run_metagpt, args=(idea, project_path), daemon=True).start()
         self._json(200, {"status": "started"})
 
     def _json(self, code, obj):

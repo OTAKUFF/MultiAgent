@@ -6,6 +6,8 @@
 <title>MetaGPT</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <style>
 /* ── Reset & Variables ──────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -22,13 +24,8 @@
   --text-muted:#4a5578;
   --accent:#4f8cff;
   --accent-glow:rgba(79,140,255,0.15);
-  --mike:#4f8cff;
-  --alice:#f472b6;
-  --bob:#a78bfa;
-  --alex:#fb923c;
-  --dana:#34d399;
-  --eve:#fbbf24;
-  --david:#2dd4bf;
+  --mike:#4f8cff;--alice:#f472b6;--bob:#a78bfa;
+  --alex:#fb923c;--dana:#34d399;--eve:#fbbf24;--david:#2dd4bf;
   --radius:14px;
   --radius-sm:10px;
   --font-body:'DM Sans',system-ui,-apple-system,sans-serif;
@@ -53,10 +50,8 @@ body::before{
 /* ── Header ─────────────────────────────────────────────────────── */
 .header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:10px 20px;
-  border-bottom:1px solid var(--border);
-  backdrop-filter:blur(20px);background:rgba(6,10,20,0.6);
-  flex-shrink:0;
+  padding:10px 20px;border-bottom:1px solid var(--border);
+  backdrop-filter:blur(20px);background:rgba(6,10,20,0.6);flex-shrink:0;
 }
 .brand{display:flex;align-items:center;gap:10px}
 .brand-icon{
@@ -81,21 +76,40 @@ body::before{
 }
 .toggle-btn:hover{border-color:var(--accent);color:var(--text-primary)}
 .toggle-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
-/* ── 3-Column Layout ────────────────────────────────────────────── */
+/* ── Preview Dropdown ──────────────────────────────────────────── */
+.preview-dropdown-wrap{position:relative;display:inline-block}
+.preview-dropdown{
+  display:none;position:absolute;top:100%;right:0;margin-top:4px;
+  background:var(--bg-base);border:1px solid var(--border);border-radius:8px;
+  min-width:160px;z-index:100;overflow:hidden;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+.preview-dropdown.show{display:block}
+.preview-dropdown-item{
+  padding:10px 14px;font-size:0.8rem;cursor:pointer;
+  color:var(--text-secondary);transition:all 0.15s;
+}
+.preview-dropdown-item:hover{background:var(--accent-glow);color:var(--text-primary)}
+/* ── 4-Column Layout ───────────────────────────────────────────── */
 .main{
   display:grid;
-  grid-template-columns:var(--left-width) 1fr var(--right-width);
-  flex:1;overflow:hidden;
-  transition:grid-template-columns 0.3s ease;
+  grid-template-columns:var(--left-width) 1fr 0px var(--right-width);
+  flex:1;overflow:hidden;transition:grid-template-columns 0.3s ease;
 }
-.main.left-collapsed{grid-template-columns:0px 1fr var(--right-width)}
-.main.right-open{--right-width:320px}
+.main.left-collapsed{grid-template-columns:0px 1fr 0px var(--right-width)}
+.main.right-open{--right-width:50vw;grid-template-columns:var(--left-width) 1fr 5px var(--right-width)}
+.main.left-collapsed.right-open{grid-template-columns:0px 1fr 5px var(--right-width)}
+/* ── Resize Handle ─────────────────────────────────────────────── */
+.resize-handle{
+  width:5px;cursor:col-resize;background:transparent;
+  transition:background 0.2s;position:relative;z-index:10;
+}
+.resize-handle:hover,.resize-handle.active{background:var(--accent)}
 /* ── Left: Project List ─────────────────────────────────────────── */
 .left-panel{
   display:flex;flex-direction:column;
   border-right:1px solid var(--border);
-  background:rgba(6,10,20,0.4);
-  overflow:hidden;transition:opacity 0.3s;
+  background:rgba(6,10,20,0.4);overflow:hidden;transition:opacity 0.3s;
 }
 .main.left-collapsed .left-panel{opacity:0;pointer-events:none}
 .left-header{
@@ -114,6 +128,9 @@ body::before{
 .project-item.active{background:var(--accent-glow);border:1px solid var(--border-active)}
 .project-item .p-name{font-size:0.82rem;font-weight:500;color:var(--text-primary);margin-bottom:2px}
 .project-item .p-time{font-size:0.68rem;color:var(--text-muted);font-family:var(--font-mono)}
+.project-item .p-status{font-size:0.65rem;color:var(--accent)}
+.project-item .p-status.done{color:var(--dana)}
+.project-item .p-status.error{color:#ef4444}
 .new-project-btn{
   margin:8px;padding:10px;border-radius:var(--radius-sm);
   border:1px dashed var(--border);background:none;
@@ -122,16 +139,13 @@ body::before{
 }
 .new-project-btn:hover{border-color:var(--accent);color:var(--accent)}
 /* ── Center: Chat Area ──────────────────────────────────────────── */
-.chat-col{
-  display:flex;flex-direction:column;overflow:hidden;
-}
+.chat-col{display:flex;flex-direction:column;overflow:hidden}
 .chat-scroll{
   flex:1;overflow-y:auto;padding:20px 24px;scroll-behavior:smooth;
   display:flex;flex-direction:column;
 }
 .chat-scroll::-webkit-scrollbar{width:4px}
 .chat-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-/* Chat bubbles */
 .chat-msg{display:flex;gap:10px;margin-bottom:14px;animation:msgIn 0.3s ease both;max-width:85%}
 @keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .chat-msg.role{align-self:flex-start}
@@ -145,31 +159,15 @@ body::before{
   padding:10px 14px;border-radius:14px;font-size:0.84rem;line-height:1.55;
   word-break:break-word;white-space:pre-wrap;
 }
-.chat-msg.role .chat-bubble{
-  background:var(--bg-card);border:1px solid var(--border);
-  border-top-left-radius:4px;
-}
-.chat-msg.user .chat-bubble{
-  background:linear-gradient(135deg,var(--accent),#6366f1);color:#fff;
-  border-top-right-radius:4px;
-}
-.chat-msg.system .chat-bubble{
-  background:rgba(100,116,139,0.12);color:var(--text-secondary);
-  font-size:0.78rem;text-align:center;border-radius:8px;
-}
+.chat-msg.role .chat-bubble{background:var(--bg-card);border:1px solid var(--border);border-top-left-radius:4px}
+.chat-msg.user .chat-bubble{background:linear-gradient(135deg,var(--accent),#6366f1);color:#fff;border-top-right-radius:4px}
+.chat-msg.system .chat-bubble{background:rgba(100,116,139,0.12);color:var(--text-secondary);font-size:0.78rem;text-align:center;border-radius:8px}
 .chat-sender{font-size:0.7rem;font-weight:600;margin-bottom:3px}
 .chat-time{font-size:0.62rem;color:var(--text-muted);margin-top:4px;font-family:var(--font-mono)}
-/* Code blocks inside bubbles */
-.chat-bubble pre{
-  background:rgba(0,0,0,0.3);border-radius:6px;padding:8px 10px;
-  margin:6px 0;overflow-x:auto;font-family:var(--font-mono);font-size:0.78rem;
-}
-.chat-bubble code{
-  font-family:var(--font-mono);font-size:0.8rem;
-  background:rgba(0,0,0,0.2);padding:1px 5px;border-radius:3px;
-}
+.chat-bubble pre{background:rgba(0,0,0,0.3);border-radius:6px;padding:8px 10px;margin:6px 0;overflow-x:auto;font-family:var(--font-mono);font-size:0.78rem}
+.chat-bubble code{font-family:var(--font-mono);font-size:0.8rem;background:rgba(0,0,0,0.2);padding:1px 5px;border-radius:3px}
 .chat-bubble pre code{background:none;padding:0}
-/* Thinking indicator */
+/* ── Thinking Indicator ──────────────────────────────────────────── */
 .thinking-indicator{
   display:inline-flex;align-items:center;gap:6px;
   padding:8px 14px;border-radius:14px;background:var(--bg-card);
@@ -209,23 +207,68 @@ body::before{
   padding:10px 20px;border-radius:var(--radius-sm);border:none;
   background:linear-gradient(135deg,var(--accent),#7c5cfc);
   color:#fff;font-family:var(--font-body);font-size:0.85rem;font-weight:600;
-  cursor:pointer;white-space:nowrap;transition:opacity 0.2s,transform 0.1s;
-  flex-shrink:0;
+  cursor:pointer;white-space:nowrap;transition:opacity 0.2s,transform 0.1s;flex-shrink:0;
 }
 .send-btn:hover{opacity:0.9;transform:translateY(-1px)}
 .send-btn:active{transform:translateY(0)}
 .send-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
-/* ── Right: Code Preview ────────────────────────────────────────── */
+/* ── Right Panel ───────────────────────────────────────────────── */
 .right-panel{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  display:flex;flex-direction:column;
   border-left:1px solid var(--border);background:rgba(6,10,20,0.4);
   overflow:hidden;transition:opacity 0.3s;
 }
 .main:not(.right-open) .right-panel{opacity:0;pointer-events:none;width:0}
-.right-placeholder{text-align:center;color:var(--text-muted);padding:20px}
-.right-placeholder svg{width:48px;height:48px;opacity:0.3;margin-bottom:12px}
-.right-placeholder p{font-size:0.82rem}
-.right-placeholder span{font-size:0.7rem;opacity:0.6}
+.right-panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.right-panel-title{font-size:0.82rem;font-weight:600;color:var(--text-secondary)}
+.right-panel-close{
+  background:none;border:none;color:var(--text-muted);font-size:1.2rem;
+  cursor:pointer;padding:2px 6px;border-radius:4px;transition:all 0.15s;
+}
+.right-panel-close:hover{color:var(--text-primary);background:var(--bg-card-hover)}
+/* ── App Viewer ────────────────────────────────────────────────── */
+.app-viewer{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.app-viewer iframe{flex:1;width:100%;border:none;background:#fff}
+.app-viewer-msg{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:var(--text-muted);font-size:0.88rem;text-align:center;padding:20px;
+  background:var(--bg-deep);
+}
+/* ── Code Editor ───────────────────────────────────────────────── */
+.code-editor{flex:1;display:grid;grid-template-columns:180px 1fr;overflow:hidden}
+.file-tree{
+  overflow-y:auto;border-right:1px solid var(--border);padding:8px 0;
+  background:rgba(6,10,20,0.3);
+}
+.file-tree::-webkit-scrollbar{width:3px}
+.file-tree::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.file-tree-item{
+  padding:4px 10px;font-size:0.75rem;cursor:pointer;
+  color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:all 0.1s;display:flex;align-items:center;gap:4px;
+}
+.file-tree-item:hover{background:var(--bg-card-hover);color:var(--text-primary)}
+.file-tree-item.active{background:var(--accent-glow);color:var(--accent)}
+.file-tree-item.dir{font-weight:500;color:var(--text-primary)}
+.file-tree-item .arrow{
+  display:inline-block;width:12px;text-align:center;font-size:0.6rem;
+  transition:transform 0.15s;flex-shrink:0;
+}
+.file-tree-item .arrow.open{transform:rotate(90deg)}
+.file-tree-children{display:none}
+.file-tree-children.open{display:block}
+.code-content{
+  overflow:auto;padding:0;background:rgba(0,0,0,0.2);
+}
+.code-content pre{margin:0;padding:12px 16px;font-size:0.78rem;line-height:1.6}
+.code-content code{font-family:var(--font-mono) !important}
+.code-content .no-file{
+  display:flex;align-items:center;justify-content:center;
+  height:100%;color:var(--text-muted);font-size:0.85rem;
+}
 /* ── Empty state ────────────────────────────────────────────────── */
 .chat-empty{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -235,14 +278,13 @@ body::before{
 .chat-empty p{font-size:0.88rem}
 /* ── Responsive ─────────────────────────────────────────────────── */
 @media(max-width:768px){
-  .main{grid-template-columns:0px 1fr 0px !important}
-  .left-panel,.right-panel{display:none}
+  .main{grid-template-columns:0px 1fr 0px 0px !important}
+  .left-panel,.right-panel,.resize-handle{display:none}
 }
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- Header -->
   <header class="header">
     <div class="brand">
       <div class="brand-icon">
@@ -256,22 +298,21 @@ body::before{
         <span id="connText">未连接</span>
       </div>
       <button class="toggle-btn" id="toggleLeft" onclick="toggleLeft()">项目列表</button>
-      <button class="toggle-btn" id="toggleRight" onclick="toggleRight()">代码预览</button>
+      <div class="preview-dropdown-wrap">
+        <button class="toggle-btn" id="toggleRight" onclick="togglePreviewDropdown()">预览</button>
+        <div class="preview-dropdown" id="previewDropdown">
+          <div class="preview-dropdown-item" onclick="openPreview('viewer')">&#9654; 应用查看器</div>
+          <div class="preview-dropdown-item" onclick="openPreview('editor')">&#128196; 代码编辑器</div>
+        </div>
+      </div>
     </div>
   </header>
-
-  <!-- Main 3-column -->
   <div class="main" id="mainGrid">
-    <!-- Left: Projects -->
     <div class="left-panel">
-      <div class="left-header">
-        <span class="left-title">项目</span>
-      </div>
+      <div class="left-header"><span class="left-title">项目</span></div>
       <div class="project-list" id="projectList"></div>
       <button class="new-project-btn" onclick="newProject()">+ 新建项目</button>
     </div>
-
-    <!-- Center: Chat -->
     <div class="chat-col">
       <div class="chat-scroll" id="chatScroll">
         <div class="chat-empty" id="chatEmpty">
@@ -284,334 +325,23 @@ body::before{
         <button class="send-btn" id="sendBtn" onclick="sendMessage()">发送</button>
       </div>
     </div>
-
-    <!-- Right: Code Preview -->
-    <div class="right-panel">
-      <div class="right-placeholder">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
-        <p>代码预览</p>
-        <span>即将上线</span>
+    <div class="resize-handle" id="resizeHandle"></div>
+    <div class="right-panel" id="rightPanel">
+      <div class="right-panel-header">
+        <span class="right-panel-title" id="rightPanelTitle">预览</span>
+        <button class="right-panel-close" onclick="closePreview()">&times;</button>
+      </div>
+      <div class="app-viewer" id="appViewer" style="display:none">
+        <iframe id="previewIframe"></iframe>
+        <div class="app-viewer-msg" id="viewerMsg" style="display:none"></div>
+      </div>
+      <div class="code-editor" id="codeEditor" style="display:none">
+        <div class="file-tree" id="fileTree"></div>
+        <div class="code-content" id="codeContent"><div class="no-file">选择文件查看代码</div></div>
       </div>
     </div>
   </div>
 </div>
-
-<script>
-/* ── Constants ────────────────────────────────────────────────────── */
-const WS_URL = "ws://127.0.0.1:8766";
-const TEAM = [
-  {id:"Mike",  role:"TeamLeader",    color:"#4f8cff", initial:"M"},
-  {id:"Alice", role:"ProductManager", color:"#f472b6", initial:"A"},
-  {id:"Bob",   role:"Architect",     color:"#a78bfa", initial:"B"},
-  {id:"Alex",  role:"Engineer",      color:"#fb923c", initial:"X"},
-  {id:"Dana",  role:"DataAnalyst",   color:"#34d399", initial:"D"},
-  {id:"Eve",   role:"QA",           color:"#fbbf24", initial:"E"},
-  {id:"David", role:"Developer",     color:"#2dd4bf", initial:"V"},
-];
-const ROLE_COLOR = {};
-const ROLE_INITIAL = {};
-TEAM.forEach(m => { ROLE_COLOR[m.id] = m.color; ROLE_INITIAL[m.id] = m.initial; });
-
-/* ── State ────────────────────────────────────────────────────────── */
-let ws, metagptRunning = false, currentProjectId = null;
-let llmBuffer = "", thinkingEl = null;
-
-/* ── Helpers ──────────────────────────────────────────────────────── */
-function now(){ return new Date().toLocaleTimeString("zh-CN",{hour12:false}) }
-function escHtml(s){ const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
-
-function renderMarkdown(text){
-  // Code blocks
-  let html = escHtml(text);
-  html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code}</code></pre>`);
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  return html;
-}
-
-/* ── Chat Message Rendering ───────────────────────────────────────── */
-function addChatMessage(role, text, type){
-  const empty = document.getElementById("chatEmpty");
-  if(empty) empty.remove();
-  removeThinking();
-
-  const scroll = document.getElementById("chatScroll");
-  const wrap = document.createElement("div");
-
-  if(type === "system"){
-    wrap.className = "chat-msg system";
-    wrap.innerHTML = `<div class="chat-bubble">${renderMarkdown(text)}</div>`;
-  } else if(type === "user"){
-    wrap.className = "chat-msg user";
-    wrap.innerHTML =
-      `<div class="chat-avatar" style="background:var(--accent)">U</div>` +
-      `<div><div class="chat-bubble">${renderMarkdown(text)}</div>` +
-      `<div class="chat-time" style="text-align:right">${now()}</div></div>`;
-  } else {
-    const c = ROLE_COLOR[role] || "#64748b";
-    const ini = ROLE_INITIAL[role] || (role ? role[0].toUpperCase() : "?");
-    wrap.className = "chat-msg role";
-    wrap.innerHTML =
-      `<div class="chat-avatar" style="background:${c}">${ini}</div>` +
-      `<div><div class="chat-sender" style="color:${c}">${escHtml(role||"System")}</div>` +
-      `<div class="chat-bubble">${renderMarkdown(text)}</div>` +
-      `<div class="chat-time">${now()}</div></div>`;
-  }
-  scroll.appendChild(wrap);
-  while(scroll.children.length > 300) scroll.removeChild(scroll.firstChild);
-  scroll.scrollTop = scroll.scrollHeight;
-}
-
-/* ── Thinking Indicator ───────────────────────────────────────────── */
-function showThinking(){
-  if(thinkingEl) return;
-  const scroll = document.getElementById("chatScroll");
-  thinkingEl = document.createElement("div");
-  thinkingEl.className = "thinking-indicator";
-  thinkingEl.innerHTML =
-    `<div class="thinking-dots"><span></span><span></span><span></span></div>` +
-    `<span>AI 思考中...</span>` +
-    `<div class="thinking-content" id="thinkingContent"></div>`;
-  thinkingEl.onclick = () => thinkingEl.classList.toggle("expanded");
-  scroll.appendChild(thinkingEl);
-  scroll.scrollTop = scroll.scrollHeight;
-}
-
-function updateThinking(text){
-  if(!thinkingEl) showThinking();
-  const content = thinkingEl.querySelector(".thinking-content");
-  if(content){
-    content.textContent = text.slice(-2000);
-  }
-}
-
-function removeThinking(){
-  if(thinkingEl){ thinkingEl.remove(); thinkingEl = null; }
-}
-
-/* ── WebSocket Message Handler ────────────────────────────────────── */
-function handleMessage(data){
-  const block = data.block || "";
-  const name  = data.name  || "";
-  const value = data.value;
-  const role  = data.role  || "";
-
-  // Control messages
-  if(block === "Control" && name === "status"){
-    const btn = document.getElementById("sendBtn");
-    const input = document.getElementById("chatInput");
-    if(value === "running"){
-      metagptRunning = true;
-      btn.textContent = "运行中...";
-      btn.disabled = true;
-    } else {
-      metagptRunning = false;
-      btn.textContent = "发送";
-      btn.disabled = false;
-      removeThinking();
-      if(value === "finished"){
-        addChatMessage(null, "MetaGPT 运行完成", "system");
-      } else if(value === "error"){
-        addChatMessage(null, "MetaGPT 运行出错", "system");
-      }
-    }
-    return;
-  }
-
-  // LLM streaming tokens
-  if(name === "content" && typeof value === "string"){
-    llmBuffer += value;
-    showThinking();
-    updateThinking(llmBuffer);
-    return;
-  }
-
-  // LLM stream end
-  if(name === "end_marker"){
-    llmBuffer = "";
-    removeThinking();
-    return;
-  }
-
-  // Task list update
-  if(block === "Task" && name === "object" && value && value.tasks){
-    addChatMessage(role || "System", "任务状态更新 — 当前: " + (value.current_task_id || "—"), "role");
-    return;
-  }
-
-  // Thought events
-  if(block === "Thought" && name === "object" && value){
-    const type = value.type || "";
-    const stage = value.stage || "";
-    const labels = {"react":"思考中","classify":"意图分类","quick":"快速回答","search":"搜索增强"};
-    addChatMessage(role, (labels[type] || type) + (stage ? " / " + stage : ""), "role");
-    return;
-  }
-
-  // Docs events
-  if(block === "Docs"){
-    if(name === "meta" && value && value.type){
-      const labels = {"prd":"需求文档","design":"系统设计","task":"任务列表"};
-      addChatMessage(role || "Alice", "正在撰写" + (labels[value.type] || value.type) + "...", "role");
-    } else if(name === "path"){
-      const filename = String(value).split(/[\\/]/).pop();
-      addChatMessage(role || "System", "文档已保存: " + filename, "role");
-    }
-    return;
-  }
-
-  // Editor events
-  if(block === "Editor"){
-    if(name === "meta" && value && value.filename){
-      addChatMessage(role || "Alex", "正在编写: " + value.filename, "role");
-    } else if(name === "path"){
-      const filename = String(value).split(/[\\/]/).pop();
-      addChatMessage(role || "Alex", "代码已保存: " + filename, "role");
-    }
-    return;
-  }
-
-  // Terminal events
-  if(block === "Terminal" && name === "cmd"){
-    addChatMessage(role || "Alex", "$ " + String(value).trim().slice(0,80), "role");
-    return;
-  }
-
-  // Log messages
-  if(block === "Log"){
-    addChatMessage(role || "System", value, "role");
-    return;
-  }
-}
-
-/* ── WebSocket Connection ─────────────────────────────────────────── */
-function connect(){
-  ws = new WebSocket(WS_URL);
-  const dot  = document.getElementById("connDot");
-  const text = document.getElementById("connText");
-
-  ws.onopen = () => {
-    dot.classList.add("on");
-    text.textContent = "已连接";
-    addChatMessage(null, "已连接到 MetaGPT 服务，请输入需求开始", "system");
-  };
-
-  ws.onmessage = (e) => {
-    try { handleMessage(JSON.parse(e.data)); }
-    catch(err){ addChatMessage(null, "消息解析失败", "system"); }
-  };
-
-  ws.onclose = () => {
-    dot.classList.remove("on");
-    text.textContent = "已断开";
-    setTimeout(connect, 5000);
-  };
-
-  ws.onerror = () => ws.close();
-}
-connect();
-
-/* ── Send / Start ─────────────────────────────────────────────────── */
-function sendMessage(){
-  const input = document.getElementById("chatInput");
-  const btn = document.getElementById("sendBtn");
-  const idea = input.value.trim();
-  if(!idea) return;
-
-  addChatMessage(null, idea, "user");
-  input.value = "";
-  input.style.height = "auto";
-
-  if(metagptRunning){
-    addChatMessage(null, "MetaGPT 正在运行中，用户回复功能开发中...", "system");
-    return;
-  }
-
-  btn.textContent = "提交中...";
-  btn.disabled = true;
-  fetch("/start", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({idea: idea})
-  }).then(r => r.json()).then(data => {
-    if(data.error){
-      addChatMessage(null, data.error, "system");
-      btn.textContent = "发送";
-      btn.disabled = false;
-    }
-  }).catch(err => {
-    addChatMessage(null, "请求失败: " + err.message, "system");
-    btn.textContent = "发送";
-    btn.disabled = false;
-  });
-}
-
-/* ── Input: Enter/Shift+Enter & Auto-resize ───────────────────────── */
-const chatInput = document.getElementById("chatInput");
-chatInput.addEventListener("keydown", function(e){
-  if(e.key === "Enter" && !e.shiftKey){
-    e.preventDefault();
-    sendMessage();
-  }
-});
-chatInput.addEventListener("input", function(){
-  this.style.height = "auto";
-  this.style.height = Math.min(this.scrollHeight, 120) + "px";
-});
-
-/* ── Project Sidebar ──────────────────────────────────────────────── */
-function loadProjects(){
-  fetch("/api/projects").then(r => r.json()).then(data => {
-    const list = document.getElementById("projectList");
-    list.innerHTML = "";
-    (data.projects || []).forEach(p => {
-      const div = document.createElement("div");
-      div.className = "project-item" + (p.id === currentProjectId ? " active" : "");
-      let timeStr = "";
-      if(p.timestamp){
-        try {
-          const ts = parseInt(p.timestamp);
-          if(!isNaN(ts)) timeStr = new Date(ts * 1000).toLocaleString("zh-CN");
-        } catch(e){}
-      }
-      div.innerHTML = `<div class="p-name">${escHtml(p.name)}</div>` +
-        (timeStr ? `<div class="p-time">${timeStr}</div>` : "");
-      div.onclick = () => selectProject(p.id);
-      list.appendChild(div);
-    });
-  }).catch(() => {});
-}
-
-function selectProject(id){
-  currentProjectId = id;
-  document.querySelectorAll(".project-item").forEach(el => el.classList.remove("active"));
-  const items = document.querySelectorAll(".project-item");
-  items.forEach(el => {
-    if(el.querySelector(".p-name").textContent === id || el.dataset.id === id)
-      el.classList.add("active");
-  });
-  loadProjects();
-}
-
-function newProject(){
-  currentProjectId = null;
-  document.getElementById("chatScroll").innerHTML =
-    `<div class="chat-empty" id="chatEmpty">` +
-    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>` +
-    `<p>输入需求，开始与 AI 团队协作</p></div>`;
-  document.getElementById("chatInput").focus();
-}
-
-loadProjects();
-
-/* ── Panel Toggle ─────────────────────────────────────────────────── */
-function toggleLeft(){
-  document.getElementById("mainGrid").classList.toggle("left-collapsed");
-  document.getElementById("toggleLeft").classList.toggle("active");
-}
-function toggleRight(){
-  document.getElementById("mainGrid").classList.toggle("right-open");
-  document.getElementById("toggleRight").classList.toggle("active");
-}
-</script>
+<script src="app.js"></script>
 </body>
 </html>
