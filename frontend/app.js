@@ -2,19 +2,19 @@
 const WS_URL = "ws://127.0.0.1:8766";
 const TEAM = [
   {id:"Mike",  role:"TeamLeader",    color:"#4f8cff", initial:"M"},
-  {id:"Alice", role:"ProductManager", color:"#f472b6", initial:"A"},
-  {id:"Bob",   role:"Architect",     color:"#a78bfa", initial:"B"},
-  {id:"Alex",  role:"Engineer",      color:"#fb923c", initial:"X"},
-  {id:"Dana",  role:"DataAnalyst",   color:"#34d399", initial:"D"},
-  {id:"Eve",   role:"QA",           color:"#fbbf24", initial:"E"},
-  {id:"David", role:"Developer",     color:"#2dd4bf", initial:"V"},
+  {id:"Alice", role:"ProductManager", color:"#e84393", initial:"A"},
+  {id:"Bob",   role:"Architect",     color:"#7c3aed", initial:"B"},
+  {id:"Alex",  role:"Engineer",      color:"#ea580c", initial:"X"},
+  {id:"Dana",  role:"DataAnalyst",   color:"#059669", initial:"D"},
+  {id:"Eve",   role:"QA",           color:"#d97706", initial:"E"},
+  {id:"David", role:"Developer",     color:"#0d9488", initial:"V"},
 ];
 const ROLE_COLOR = {};
 const ROLE_INITIAL = {};
 TEAM.forEach(m => { ROLE_COLOR[m.id] = m.color; ROLE_INITIAL[m.id] = m.initial; });
 
 /* ── State ────────────────────────────────────────────────────────── */
-let ws, metagptRunning = false;
+let ws, forgeRunning = false;
 let llmBuffer = "", thinkingEl = null;
 let projects = [];          // all project objects
 let activeProjectId = null; // currently selected project id (null = new project mode)
@@ -53,7 +53,7 @@ function createProject(idea){
 }
 
 function switchProject(id){
-  if(metagptRunning && activeProjectId !== id){
+  if(forgeRunning && activeProjectId !== id){
     // Don't switch away from running project's chat, but allow selecting it
   }
   activeProjectId = id;
@@ -263,14 +263,14 @@ function handleMessage(data){
   if(block === "Control" && name === "status"){
     const btn = document.getElementById("sendBtn");
     if(value === "running"){
-      metagptRunning = true;
+      forgeRunning = true;
       btn.textContent = "运行中...";
       btn.disabled = true;
     } else {
-      metagptRunning = false;
+      forgeRunning = false;
       removeThinking();
       if(value === "finished"){
-        addChatMessage(null, "MetaGPT 运行完成", "system");
+        addChatMessage(null, "Code Forge 运行完成", "system");
         updateProjectStatus("finished");
         // Auto-refresh preview if open
         if(previewMode){
@@ -281,7 +281,7 @@ function handleMessage(data){
           }
         }
       } else if(value === "error"){
-        addChatMessage(null, "MetaGPT 运行出错", "system");
+        addChatMessage(null, "Code Forge 运行出错", "system");
         updateProjectStatus("error");
       }
       btn.textContent = "发送";
@@ -358,7 +358,7 @@ function connect(){
   ws.onopen = () => {
     dot.classList.add("on");
     text.textContent = "已连接";
-    addChatMessage(null, "已连接到 MetaGPT 服务，请输入需求开始", "system");
+    addChatMessage(null, "已连接到 Code Forge 服务，请输入需求开始", "system");
   };
   ws.onmessage = (e) => {
     try { handleMessage(JSON.parse(e.data)); }
@@ -392,8 +392,8 @@ function sendMessage(){
   input.value = "";
   input.style.height = "auto";
 
-  if(metagptRunning){
-    addChatMessage(null, "MetaGPT 正在运行中，请等待完成...", "system");
+  if(forgeRunning){
+    addChatMessage(null, "Code Forge 正在运行中，请等待完成...", "system");
     return;
   }
 
@@ -466,31 +466,19 @@ function toggleLeft(){
   document.getElementById("toggleLeft").classList.toggle("active");
 }
 
-/* ── Preview Dropdown ────────────────────────────────────────────── */
-function togglePreviewDropdown(){
-  const dd = document.getElementById("previewDropdown");
-  dd.classList.toggle("show");
-}
-// Close dropdown on outside click
-document.addEventListener("click", function(e){
-  const wrap = document.querySelector(".preview-dropdown-wrap");
-  if(wrap && !wrap.contains(e.target)){
-    document.getElementById("previewDropdown").classList.remove("show");
-  }
-});
-
 /* ── Preview Panel ───────────────────────────────────────────────── */
 function openPreview(mode){
-  document.getElementById("previewDropdown").classList.remove("show");
   previewMode = mode;
   const grid = document.getElementById("mainGrid");
   const viewer = document.getElementById("appViewer");
   const editor = document.getElementById("codeEditor");
   const title = document.getElementById("rightPanelTitle");
-  const btn = document.getElementById("toggleRight");
+  const btnV = document.getElementById("btnViewer");
+  const btnE = document.getElementById("btnEditor");
 
   grid.classList.add("right-open");
-  btn.classList.add("active");
+  btnV.classList.toggle("active", mode === "viewer");
+  btnE.classList.toggle("active", mode === "editor");
 
   if(mode === "viewer"){
     viewer.style.display = "flex";
@@ -513,7 +501,8 @@ function closePreview(){
   previewMode = null;
   const grid = document.getElementById("mainGrid");
   grid.classList.remove("right-open");
-  document.getElementById("toggleRight").classList.remove("active");
+  document.getElementById("btnViewer").classList.remove("active");
+  document.getElementById("btnEditor").classList.remove("active");
   document.getElementById("appViewer").style.display = "none";
   document.getElementById("codeEditor").style.display = "none";
   // Clear iframe
