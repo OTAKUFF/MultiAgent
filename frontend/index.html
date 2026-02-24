@@ -199,6 +199,64 @@ body::before{
   max-height:150px;overflow-y:auto;
 }
 .thinking-indicator.expanded .thinking-content{display:block}
+/* ── Role Activity Card ──────────────────────────────────────────── */
+.role-card{margin-bottom:18px;animation:msgIn 0.3s ease both;max-width:92%}
+.role-card-header{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.role-card-avatar{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  display:grid;place-items:center;font-size:0.75rem;font-weight:700;color:#fff;
+}
+.role-card-name{font-size:0.88rem;font-weight:600}
+.role-card-title{font-size:0.72rem;color:var(--text-muted);margin-left:2px}
+.role-card-badge{
+  font-size:0.68rem;color:var(--text-secondary);background:var(--bg-card);
+  padding:2px 8px;border-radius:10px;margin-left:auto;white-space:nowrap;
+}
+.role-card-body{margin-left:46px}
+.role-card-thinking{
+  font-size:0.82rem;color:var(--text-secondary);line-height:1.6;
+  margin-bottom:10px;white-space:pre-wrap;word-break:break-word;
+  max-height:120px;overflow:hidden;position:relative;
+}
+.role-card-thinking.expanded{max-height:none}
+.role-card-thinking.clamped::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:32px;
+  background:linear-gradient(transparent,var(--bg-deep));pointer-events:none;
+}
+.role-card-thinking.expanded.clamped::after{display:none}
+.role-card-steps{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.role-card-step{
+  display:flex;align-items:center;gap:8px;padding:5px 10px;
+  border-radius:8px;background:var(--bg-card);font-size:0.78rem;color:var(--text-primary);
+  border:1px solid var(--border);transition:background 0.15s;
+}
+.role-card-step:hover{background:var(--bg-card-hover)}
+.step-icon{width:16px;flex-shrink:0;text-align:center;font-size:0.85rem}
+.step-label{font-weight:500;color:var(--text-secondary)}
+.step-detail{color:var(--text-primary);margin-left:2px}
+.step-expand{
+  padding:4px 10px;font-size:0.74rem;color:var(--accent);cursor:pointer;
+  border:none;background:none;font-family:var(--font-body);
+  display:flex;align-items:center;gap:4px;border-radius:6px;transition:background 0.15s;
+}
+.step-expand:hover{background:var(--accent-glow)}
+.step-group-hidden{display:none}
+.step-group-hidden.show{display:flex;flex-direction:column;gap:3px}
+.role-card-reply{
+  font-size:0.84rem;line-height:1.65;color:var(--text-primary);
+  padding:10px 14px;border-radius:12px;background:#f3f4f6;
+  border:1px solid var(--border);word-break:break-word;white-space:pre-wrap;
+  margin-bottom:6px;
+}
+.role-card-reply code{font-family:var(--font-mono);font-size:0.8rem;background:rgba(0,0,0,0.05);padding:1px 5px;border-radius:3px}
+.role-card-reply pre{background:rgba(0,0,0,0.04);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin:6px 0;overflow-x:auto;font-family:var(--font-mono);font-size:0.78rem}
+.role-card-reply pre code{background:none;padding:0}
+.role-card-time{font-size:0.62rem;color:var(--text-muted);font-family:var(--font-mono);margin-top:4px}
+.role-card-mention{
+  display:inline-flex;align-items:center;gap:4px;padding:2px 8px;
+  border-radius:4px;background:rgba(79,140,255,0.08);color:var(--accent);
+  font-size:0.78rem;font-weight:500;margin:4px 0;
+}
 /* ── Input Area ─────────────────────────────────────────────────── */
 .input-area{
   padding:12px 20px 16px;border-top:1px solid var(--border);
