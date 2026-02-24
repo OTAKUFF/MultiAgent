@@ -457,6 +457,76 @@ function _reapplyCollapse(stepsEl){
   stepsEl.appendChild(hidden);
 }
 
+/* ── Project Completion Card ──────────────────────────────────────── */
+function insertProjectCard(status){
+  const proj = getActiveProject();
+  if(!proj) return;
+  const cardData = {
+    projectName: proj.name,
+    projectPath: proj.path,
+    completionTime: new Date().toLocaleString("zh-CN",{hour12:false}),
+    status: status
+  };
+  const t = now();
+  if(proj){ proj.chatHistory.push({role:null, text:JSON.stringify(cardData), type:"project-card", time:t}); saveChatHistory(proj.id); }
+  renderProjectCard(cardData, t);
+}
+
+function renderProjectCard(cardData, time){
+  const scroll = document.getElementById("chatScroll");
+  const empty = document.getElementById("chatEmpty");
+  if(empty) empty.remove();
+  removeThinking();
+  const isError = cardData.status === "error";
+  const statusText = isError ? "出错" : "已完成";
+  const statusCls = isError ? " error" : "";
+  const icon = isError ? "⚠️" : "🎉";
+  const wrap = document.createElement("div");
+  wrap.className = "project-card";
+  wrap.innerHTML =
+    `<div class="project-card-inner">`+
+      `<div class="project-card-header">`+
+        `<div class="project-card-icon">${icon}</div>`+
+        `<div class="project-card-info">`+
+          `<div class="project-card-name">${escHtml(cardData.projectName)}</div>`+
+          `<div class="project-card-meta">${escHtml(cardData.completionTime)}</div>`+
+        `</div>`+
+        `<span class="project-card-status${statusCls}">${statusText}</span>`+
+      `</div>`+
+      `<div class="project-card-actions">`+
+        `<button class="project-card-btn" data-mode="viewer">🖥 应用查看器</button>`+
+        `<button class="project-card-btn" data-mode="editor">📝 代码编辑器</button>`+
+      `</div>`+
+    `</div>`;
+  const path = cardData.projectPath;
+  wrap.querySelector('[data-mode="viewer"]').onclick = function(){ openPreviewWithPath(path, "viewer"); };
+  wrap.querySelector('[data-mode="editor"]').onclick = function(){ openPreviewWithPath(path, "editor"); };
+  scroll.appendChild(wrap);
+  while(scroll.children.length > 300) scroll.removeChild(scroll.firstChild);
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+function openPreviewWithPath(path, mode){
+  previewMode = mode;
+  const grid=document.getElementById("mainGrid");
+  const viewer=document.getElementById("appViewer");
+  const editor=document.getElementById("codeEditor");
+  const title=document.getElementById("rightPanelTitle");
+  const btnV=document.getElementById("btnViewer");
+  const btnE=document.getElementById("btnEditor");
+  grid.classList.add("right-open");
+  btnV.classList.toggle("active",mode==="viewer");
+  btnE.classList.toggle("active",mode==="editor");
+  const fakeProj = {path: path};
+  if(mode==="viewer"){
+    viewer.style.display="flex"; editor.style.display="none"; title.textContent="应用查看器";
+    loadAppViewer(fakeProj);
+  } else {
+    viewer.style.display="none"; editor.style.display="grid"; title.textContent="代码编辑器";
+    loadCodeEditor(fakeProj);
+  }
+}
+
 /* ── Chat Rendering (user & system only) ─────────────────────────── */
 function addChatMessage(role, text, type){
   if(type === "system") return;
@@ -469,6 +539,10 @@ function addChatMessage(role, text, type){
 }
 function _renderOneMessage(role, text, type, time){
   const scroll = document.getElementById("chatScroll");
+  if(type === "project-card"){
+    try { const cardData = JSON.parse(text); renderProjectCard(cardData, time); } catch(e){}
+    return;
+  }
   const wrap = document.createElement("div");
   if(type === "user"){
     wrap.className = "chat-msg user";
@@ -546,11 +620,12 @@ function handleMessage(data){
       forgeRunning = false; removeThinking();
       if(value === "finished"){
         updateProjectStatus("finished");
+        insertProjectCard("finished");
         if(previewMode){
           const proj = getActiveProject();
           if(proj && proj.path){ if(previewMode==="viewer") loadAppViewer(proj); else loadCodeEditor(proj); }
         }
-      } else if(value === "error"){ updateProjectStatus("error"); }
+      } else if(value === "error"){ updateProjectStatus("error"); insertProjectCard("error"); }
       btn.textContent="发送"; btn.disabled=false;
     }
     return;
